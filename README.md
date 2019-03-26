@@ -10,7 +10,7 @@ cimcb requires:
 - Python (>=3.5)
 - Bokeh (>=1.0.0)
 - Keras
-- NumPy
+- NumPy (>=1.12)
 - SciPy
 - scikit-learn
 - Statsmodels
