@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="cimcb",
-    version="0.0.1",
+    version="0.0.2",
     description="This is a pre-release.",
     long_description=long_description,
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
@@ -14,7 +14,7 @@ setup(
     python_requires=">=3.5",
     install_requires=["bokeh>=1.0.0",
                       "keras",
-                      "numpy",
+                      "numpy>=1.12",
                       "pandas",
                       "scipy",
                       "scikit-learn",
