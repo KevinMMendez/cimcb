@@ -21,8 +21,7 @@ setup(
                       "statsmodels",
                       "tensorflow",
                       "tqdm",
-                      "xlrd", 
-                      "tornado<6"],
+                      "xlrd"],
     author="Kevin Mendez, David Broadhurst",
     author_email="k.mendez@ecu.edu.au, d.broadhurst@ecu.edu.au",
 )
