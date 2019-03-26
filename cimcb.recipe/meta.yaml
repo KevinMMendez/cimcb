@@ -1,0 +1,47 @@
+package:
+  name: cimcb
+  version: 0.0.1
+
+source:
+  path: ../
+
+build:
+  noarch: python
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps -vv"
+
+requirements:
+  build:
+    - setuptools
+    - python >=3.5
+    - bokeh >=1.0.0
+    - keras
+    - numpy
+    - pandas
+    - scipy
+    - scikit-learn
+    - statsmodels
+    - python >=3.5
+    - tensorflow
+    - tqdm
+    - xlrd
+    - tornado <6
+
+  run:
+    - python >=3.5
+    - bokeh >=1.0.0
+    - keras
+    - numpy
+    - pandas
+    - scipy
+    - scikit-learn
+    - statsmodels
+    - tensorflow
+    - tqdm
+    - xlrd
+    - tornado <6
+
+about:
+  home: https://github.com/CIMCB
+  license: http://www.apache.org/licenses/LICENSE-2.0.html
+  summary: "This is a pre-release."
