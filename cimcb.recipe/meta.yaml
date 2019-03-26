@@ -25,7 +25,6 @@ requirements:
     - tensorflow
     - tqdm
     - xlrd
-    - tornado <6
 
   run:
     - python >=3.5
@@ -39,7 +38,6 @@ requirements:
     - tensorflow
     - tqdm
     - xlrd
-    - tornado <6
 
 about:
   home: https://github.com/CIMCB
