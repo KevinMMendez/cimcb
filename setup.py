@@ -14,7 +14,7 @@ setup(
     python_requires=">=3.5",
     install_requires=["bokeh>=1.0.0",
                       "keras",
-                      "numpy<=1.14.5,>=1.13.3",
+                      "numpy",
                       "pandas",
                       "scipy",
                       "scikit-learn",
