@@ -115,8 +115,8 @@ def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", fo
     box2 = fig.vbar("group_name", width_boxplot / 10, "q1", "q2", fill_color="color", line_color="black", alpha=0.8, source=source_boxplot)
 
     # Whiskers (almost-0 height rects)
-    whisker1 = fig.rect("group_name", "lower", 0.05, 0.01, line_color="black", source=source_boxplot)
-    whisker2 = fig.rect("group_name", "upper", 0.05, 0.01, line_color="black", source=source_boxplot)
+    whisker1 = fig.rect("group_name", "lower", 0.05, 0.001, line_color="black", source=source_boxplot)
+    whisker2 = fig.rect("group_name", "upper", 0.05, 0.001, line_color="black", source=source_boxplot)
 
     # Outliers
     outliers = fig.circle("outx", "outy", size=4, color="red", fill_alpha=0.4, source=source_outliers)

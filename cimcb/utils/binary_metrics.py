@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, roc_auc_score
 
 
-def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True):
+def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True, k=None):
     """ Return a dict of binary stats with the following metrics: R2, auc, accuracy, precision, sensitivity, specificity, and F1 score.
 
     Parameters
@@ -55,6 +55,18 @@ def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True):
     stats["SENSITIVITY"] = safe_div((tp), (tp + fn))
     stats["SPECIFICITY"] = safe_div((tn), (tn + fp))
     stats["F1-SCORE"] = safe_div((2 * tp), (2 * tp + fp + fn))
+
+    # Additional: AIC/BIC/SSE
+    n = len(y_true)
+    resid = y_true - y_pred
+    rss = sum(resid ** 2)
+    stats["SSE"] = np.log(rss)
+    if k is None:
+        stats["AIC"] = 0
+        stats["BIC"] = 0
+    else:
+        stats["AIC"] = 2 * k - 2 * np.log(rss)
+        stats["BIC"] = n * np.log(rss / n) + k * np.log(n)
     return stats
 
 

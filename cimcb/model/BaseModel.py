@@ -112,7 +112,8 @@ class BaseModel(ABC):
 
         # ROC plot
         tpr, fpr, tpr_ci, stats, stats_bootci = roc_calculate(Ytrue_train, Yscore_train, bootnum=100, metric=metric, val=val, parametric=self.parametric)
-        roc_title = "Specificity: {}".format(np.round(stats["val_specificity"], 2))
+        # roc_title = "Specificity: {}".format(np.round(stats["val_specificity"], 2))
+        roc_title = "AUC: {} ({}, {})".format(np.round(stats["AUC"], 2), np.round(stats_bootci["AUC"][0], 2), np.round(stats_bootci["AUC"][1], 2))
         roc_bokeh = roc_plot(tpr, fpr, tpr_ci, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"])
         if testset is not None:
             fpr_test, tpr_test, threshold_test = metrics.roc_curve(Ytrue_test, Yscore_test, pos_label=1, drop_intermediate=False)
@@ -171,7 +172,7 @@ class BaseModel(ABC):
             accuracy=[["{} ({}, {})".format(stats_round["ACCURACY"], bootci_round["ACCURACY"][0], bootci_round["ACCURACY"][1])]],
             precision=[["{} ({}, {})".format(stats_round["PRECISION"], bootci_round["PRECISION"][0], bootci_round["PRECISION"][1])]],
             sensitivity=[["{} ({}, {})".format(stats_round["SENSITIVITY"], bootci_round["SENSITIVITY"][0], bootci_round["SENSITIVITY"][1])]],
-            specificity=[["{} ({}, {})".format(stats_round["SPECIFICITY"], bootci_round["SPECIFICITY"][0], bootci_round["SPECIFICITY"][1])]],
+            specificity=[["{}".format(stats_round["SPECIFICITY"])]],
             F1score=[["{} ({}, {})".format(stats_round["F1-SCORE"], bootci_round["F1-SCORE"][0], bootci_round["F1-SCORE"][1])]],
             R2=[["{} ({}, {})".format(stats_round["R²"], bootci_round["R²"][0], bootci_round["R²"][1])]],
         )
@@ -193,7 +194,7 @@ class BaseModel(ABC):
 
         # Plot table
         source = ColumnDataSource(data=tabledata)
-        columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="MW-U Pvalue"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC"), TableColumn(field="accuracy", title="Accuracy"), TableColumn(field="precision", title="Precision"), TableColumn(field="sensitivity", title="Sensitivity"), TableColumn(field="F1score", title="F1score")]
+        columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="MW-U Pvalue"), TableColumn(field="R2", title="R2"), TableColumn(field="accuracy", title="Accuracy"), TableColumn(field="precision", title="Precision"), TableColumn(field="F1score", title="F1score"), TableColumn(field="sensitivity", title="Sensitivity"), TableColumn(field="specificity", title="Specificity")]
         table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
 
         # Title

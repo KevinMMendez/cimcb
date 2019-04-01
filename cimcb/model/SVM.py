@@ -13,6 +13,7 @@ class SVM(BaseModel):
 
     def __init__(self, C=1.0, kernel="rbf", degree=3, gamma="auto"):
         self.model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, probability=True)
+        self.k = None
 
     def train(self, X, Y):
         """ Fit the SVM model, save additional stats (as attributes) and return Y predicted values.

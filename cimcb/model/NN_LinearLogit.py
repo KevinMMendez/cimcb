@@ -14,6 +14,7 @@ class NN_LinearLogit(BaseModel):
         self.n_nodes = n_nodes
         self.verbose = verbose
         self.epochs = epochs
+        self.k = n_nodes
 
     def train(self, X, Y):
         """ Fit the neural network model, save additional stats (as attributes) and return Y predicted values.

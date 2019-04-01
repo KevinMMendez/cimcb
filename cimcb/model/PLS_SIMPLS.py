@@ -40,6 +40,7 @@ class PLS_SIMPLS(BaseModel):
     def __init__(self, n_components=2):
         self.model = PLSRegression()  # Should change this to an empty model
         self.n_component = n_components
+        self.k = n_components
 
     def train(self, X, Y):
         """ Fit the PLS model, save additional stats (as attributes) and return Y predicted values.

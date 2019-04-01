@@ -13,6 +13,7 @@ class RF(BaseModel):
 
     def __init__(self, n_estimators=100, max_features="auto", max_depth=None, criterion="gini"):
         self.model = RandomForestClassifier(n_estimators=n_estimators, max_features=max_features, max_depth=max_depth, criterion=criterion)
+        self.k = n_estimators
 
     def train(self, X, Y):
         """ Fit the RF model, save additional stats (as attributes) and return Y predicted values.
