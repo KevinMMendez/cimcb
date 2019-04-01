@@ -351,8 +351,7 @@ class kfold(BaseCrossVal):
         full_alpha = scaler.fit_transform(scale_full_score[:, np.newaxis])
         cv_alpha = scaler.fit_transform(scale_cv_score[:, np.newaxis])
         diff_alpha = scaler.fit_transform(scale_diff_score[:, np.newaxis])
-        # print(scale_full_score)
-        # print(full_alpha)
+
         # Text for heatmaps
         full_text = []
         cv_text = []
@@ -419,7 +418,6 @@ class kfold(BaseCrossVal):
         diff_score_neg = 1 - diff_score
         # Store information in dictionary for bokeh
         data = dict(key0_value=key1_value, key1_value=key0_value, full_score=full_score, cv_score=cv_score, diff_score=diff_score, diff_score_neg=diff_score_neg, full_alpha=full_alpha, cv_alpha=cv_alpha, diff_alpha=diff_alpha, line_key0_value=line_key0_value, line_key1_value=line_key1_value, line0_full=line0_full, line0_cv=line0_cv, line1_full=line1_full, line1_cv=line1_cv, full_text=full_text, cv_text=cv_text, diff_text=diff_text)
-        print("something")
         source = ColumnDataSource(data=data)
 
         # Heatmap FULL
