@@ -293,7 +293,7 @@ class kfold(BaseCrossVal):
         # Get key/values
         param_keys = []
         param_values = []
-        for key, value in self.param_dict.items():
+        for key, value in sorted(self.param_dict.items()):
             param_keys.append(key)
             value_to_string = list(map(str, value))
             param_values.append(value_to_string)
@@ -311,12 +311,12 @@ class kfold(BaseCrossVal):
         text = False
 
         param_keys = []
-        for key, value in param_dict.items():
+        for key, value in sorted(param_dict.items()):
             param_keys.append(key)
 
         param_values = []
         for i in range(len(param_list)):
-            for key, value in param_list[i].items():
+            for key, value in sorted(param_list[i].items()):
                 param_values.append(str(value))
 
         # param_key[0] corresponds to key0_value
