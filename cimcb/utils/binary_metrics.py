@@ -60,13 +60,18 @@ def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True, k=None):
     n = len(y_true)
     resid = y_true - y_pred
     rss = sum(resid ** 2)
-    stats["SSE"] = np.log(rss)
-    if k is None:
+    if rss == 0:
+        stats["SSE"] = 0
         stats["AIC"] = 0
         stats["BIC"] = 0
     else:
-        stats["AIC"] = 2 * k - 2 * np.log(rss)
-        stats["BIC"] = n * np.log(rss / n) + k * np.log(n)
+        stats["SSE"] = np.log(rss)
+        if k is None:
+            stats["AIC"] = 0
+            stats["BIC"] = 0
+        else:
+            stats["AIC"] = 2 * k - 2 * np.log(rss)
+            stats["BIC"] = n * np.log(rss / n) + k * np.log(n)
     return stats
 
 
