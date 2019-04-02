@@ -1,4 +1,5 @@
 import numpy as np
+from keras.optimizers import RMSprop
 from keras.models import Sequential
 from keras.layers import Dense
 from .BaseModel import BaseModel
@@ -10,11 +11,14 @@ class NN_LinearLogit(BaseModel):
     parametric = False
     bootlist = None
 
-    def __init__(self, n_nodes=2, epochs=200, verbose=0):
+    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.001, rho=0.9, epsilon=None, decay=0.0, loss="binary_crossentropy", batch_size=None, verbose=0):
         self.n_nodes = n_nodes
         self.verbose = verbose
         self.epochs = epochs
         self.k = n_nodes
+        self.batch_size = batch_size
+        self.loss = loss
+        self.optimizer = RMSprop(lr=learning_rate, rho=rho, epsilon=epsilon, decay=decay)
 
     def train(self, X, Y):
         """ Fit the neural network model, save additional stats (as attributes) and return Y predicted values.
@@ -33,11 +37,15 @@ class NN_LinearLogit(BaseModel):
             Predicted y score for samples.
         """
 
+        # If batch-size is None:
+        if self.batch_size is None:
+            self.batch_size = min(200, len(X))
+
         self.model = Sequential()
         self.model.add(Dense(self.n_nodes, activation="linear", input_dim=len(X.T)))
         self.model.add(Dense(1, activation="sigmoid"))
-        self.model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
-        self.model.fit(X, Y, epochs=self.epochs, batch_size=min(200, len(X)), verbose=self.verbose)
+        self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
+        self.model.fit(X, Y, epochs=self.epochs, batch_size=self.batch_size, verbose=self.verbose)
 
         layer1_weight = self.model.layers[0].get_weights()[0]
         layer1_bias = self.model.layers[0].get_weights()[1]

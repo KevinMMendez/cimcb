@@ -11,8 +11,8 @@ class SVM(BaseModel):
     parametric = False
     bootlist = None  # list of metrics to bootstrap
 
-    def __init__(self, C=1.0, kernel="rbf", degree=3, gamma="auto"):
-        self.model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, probability=True)
+    def __init__(self, C=1.0, kernel="rbf", degree=3, gamma="auto", tol=0.001, max_iter=-1):
+        self.model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, probability=True, tol=tol, max_iter=max_iter)
         self.k = None
 
     def train(self, X, Y):

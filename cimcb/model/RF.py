@@ -11,8 +11,8 @@ class RF(BaseModel):
     parametric = False
     bootlist = None  # list of metrics to bootstrap
 
-    def __init__(self, n_estimators=100, max_features="auto", max_depth=None, criterion="gini"):
-        self.model = RandomForestClassifier(n_estimators=n_estimators, max_features=max_features, max_depth=max_depth, criterion=criterion)
+    def __init__(self, n_estimators=100, max_features="auto", max_depth=None, criterion="gini", min_samples_split=2, min_samples_leaf=1, max_leaf_nodes=None):
+        self.model = RandomForestClassifier(n_estimators=n_estimators, max_features=max_features, max_depth=max_depth, criterion=criterion, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_leaf_nodes=max_leaf_nodes)
         self.k = n_estimators
 
     def train(self, X, Y):
