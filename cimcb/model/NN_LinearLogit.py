@@ -1,5 +1,5 @@
 import numpy as np
-from keras.optimizers import RMSprop
+from keras.optimizers import SGD
 from keras.models import Sequential
 from keras.layers import Dense
 from .BaseModel import BaseModel
@@ -11,14 +11,14 @@ class NN_LinearLogit(BaseModel):
     parametric = False
     bootlist = None
 
-    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.001, rho=0.9, epsilon=None, decay=0.0, loss="binary_crossentropy", batch_size=None, verbose=0):
+    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
         self.n_nodes = n_nodes
         self.verbose = verbose
         self.epochs = epochs
         self.k = n_nodes
         self.batch_size = batch_size
         self.loss = loss
-        self.optimizer = RMSprop(lr=learning_rate, rho=rho, epsilon=epsilon, decay=decay)
+        self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
 
     def train(self, X, Y):
         """ Fit the neural network model, save additional stats (as attributes) and return Y predicted values.
