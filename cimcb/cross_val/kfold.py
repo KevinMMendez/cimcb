@@ -128,7 +128,7 @@ class kfold(BaseCrossVal):
         table.columns = param_list_string
         return table
 
-    def plot(self, metric="r2q2", scale=1):
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear"):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -145,7 +145,7 @@ class kfold(BaseCrossVal):
         if len(self.param_dict2) == 1:
             fig = self._plot_param1(metric=metric)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
