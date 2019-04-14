@@ -3,17 +3,19 @@ from keras.callbacks import Callback
 from keras.optimizers import SGD
 from keras.models import Sequential
 from keras.layers import Dense
+from keras import regularizers
 from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
 
-class NN_LinearLinear(BaseModel):
-    """2 Layer linear-linear neural network using Keras"""
+class NN_L1(BaseModel):
+    """2 Layer linear-logistic neural network using Keras"""
 
     parametric = False
     bootlist = None
 
-    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
+    def __init__(self, l_lambda=0.01, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
+        self.l_lambda = l_lambda
         self.n_nodes = n_nodes
         self.verbose = verbose
         self.n_epochs = epochs
@@ -41,14 +43,11 @@ class NN_LinearLinear(BaseModel):
 
         # If batch-size is None:
         if self.batch_size is None:
-            self.batch_size = len(X)
-
-        # Ensure array and error check
-        X, Y = self.input_check(X, Y)
+            self.batch_size = min(200, len(X))
 
         self.model = Sequential()
-        self.model.add(Dense(self.n_nodes, activation="linear", input_dim=len(X.T)))
-        self.model.add(Dense(1, activation="linear"))
+        self.model.add(Dense(self.n_nodes, activation="linear", input_dim=len(X.T), kernel_regularizer=regularizers.l1(self.l_lambda)))
+        self.model.add(Dense(1, activation="sigmoid"))
         self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
 
         # If epoch_ypred is True, calculate ypred for each epoch

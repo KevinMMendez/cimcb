@@ -1,8 +1,10 @@
 import numpy as np
-from keras.optimizers import RMSprop
+from keras.callbacks import Callback
+from keras.optimizers import SGD
 from keras.models import Sequential
 from keras.layers import Dense
 from .BaseModel import BaseModel
+from ..utils import YpredCallback
 
 
 class NN_LogitLogit(BaseModel):
@@ -14,13 +16,13 @@ class NN_LogitLogit(BaseModel):
     def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
         self.n_nodes = n_nodes
         self.verbose = verbose
-        self.epochs = epochs
+        self.n_epochs = epochs
         self.k = n_nodes
         self.batch_size = batch_size
         self.loss = loss
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
 
-    def train(self, X, Y):
+    def train(self, X, Y, epoch_ypred=False, epoch_xtest=None):
         """ Fit the neural network model, save additional stats (as attributes) and return Y predicted values.
 
         Parameters
@@ -39,13 +41,21 @@ class NN_LogitLogit(BaseModel):
 
         # If batch-size is None:
         if self.batch_size is None:
-            self.batch_size = min(200, len(X))
+            self.batch_size = len(X)
 
         self.model = Sequential()
         self.model.add(Dense(self.n_nodes, activation="sigmoid", input_dim=len(X.T)))
         self.model.add(Dense(1, activation="sigmoid"))
         self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
-        self.model.fit(X, Y, epochs=self.epochs, batch_size=self.batch_size, verbose=self.verbose)
+
+        # If epoch_ypred is True, calculate ypred for each epoch
+        if epoch_ypred is True:
+            self.epoch = YpredCallback(self.model, X, epoch_xtest)
+        else:
+            self.epoch = Callback()
+
+        # Fit
+        self.model.fit(X, Y, epochs=self.n_epochs, batch_size=self.batch_size, verbose=self.verbose, callbacks=[self.epoch])
 
         layer1_weight = self.model.layers[0].get_weights()[0]
         layer1_bias = self.model.layers[0].get_weights()[1]

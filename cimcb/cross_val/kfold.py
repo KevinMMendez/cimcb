@@ -86,6 +86,61 @@ class kfold(BaseCrossVal):
             self.ypred_cv.append(ypred_cv_i)
             self.k.append(model_i.k)
 
+    def calc_ypred_epoch(self):
+        """Calculates ypred full and ypred cv for each epoch (edge case)."""
+        # Store Ypred
+        Y_full = []
+        Y_cv = []
+
+        # Set hyper-parameters
+        param = self.param_list[-1]
+        model = self.model(**param)
+
+        # Get crossval train + test
+        fold_split = []
+        for train, test in self.crossval_idx.split(self.X, self.Y):
+            fold_split.append((train, test))
+
+        # Split into train and test
+        for i in tqdm(range(len(fold_split)), desc="Kfold"):
+            train, test = fold_split[i]
+            X_train = self.X[train, :]
+            Y_train = self.Y[train]
+            X_test = self.X[test, :]
+            Y_test = self.Y[test]
+            # Full
+            model.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=None)
+            Y_full_split = model.epoch.Y_train
+            Y_full.append([Y_train, Y_full_split])
+
+            # CV
+            model.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
+            Y_cv_split = model.epoch.Y_test
+            Y_cv.append([Y_test, Y_cv_split])
+
+        # Put ypred into standard format
+        epoch_list = []
+        for i in self.param_list2:
+            for k, v in i.items():
+                epoch_list.append(v - 1)
+
+        self.ypred_full = []
+        self.ypred_cv = []
+        for i in epoch_list:
+            ypred_full_i = []
+            ypred_cv_i = []
+            for j in range(self.folds):
+                ypred_full_i.append([Y_full[j][0], Y_full[j][1][i]])
+                ypred_cv_i.append([Y_cv[j][0], Y_cv[j][1][i]])
+            # Append ypred to full/cv
+            self.ypred_full.append(ypred_full_i)
+            self.ypred_cv.append(ypred_cv_i)
+
+        # delete k later
+        self.k = []
+        for i in epoch_list:
+            self.k.append(model.k)
+
     def calc_stats(self):
         """Calculates binary statistics from ypred full and ypred cv."""
         stats_list = []
@@ -116,7 +171,22 @@ class kfold(BaseCrossVal):
 
     def run(self):
         """Runs all functions prior to plot."""
-        self.calc_ypred()
+        # Check that param_dict is not for epochs
+        # Epoch is a special case
+        check_epoch = []
+        for i in self.param_dict2.keys():
+            check_epoch.append(i)
+        if check_epoch == ["epochs"]:
+            # Get epoch max
+            epoch_list = []
+            for i in self.param_list2:
+                for k, v in i.items():
+                    epoch_list.append(v)
+            # Print and Calculate
+            self.calc_ypred_epoch()
+            print("returning stats at 'x' epoch interval during training until epoch={}.".format(epoch_list[-1]))
+        else:
+            self.calc_ypred()
         self.calc_stats()
 
     def _format_table(self, stats_list):
@@ -128,7 +198,7 @@ class kfold(BaseCrossVal):
         table.columns = param_list_string
         return table
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear"):
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -143,7 +213,7 @@ class kfold(BaseCrossVal):
 
         # Plot based on the number of parameters
         if len(self.param_dict2) == 1:
-            fig = self._plot_param1(metric=metric)
+            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel)
         elif len(self.param_dict2) == 2:
             fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling)
         else:
@@ -153,7 +223,7 @@ class kfold(BaseCrossVal):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2"):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True):
         """Used for plot function if the number of parameters is 1."""
         # Choose metric to plot
         metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
@@ -183,6 +253,14 @@ class kfold(BaseCrossVal):
             key_xaxis = k
             values = v
         values_string = [str(i) for i in values]
+        values_string = []
+        for i in values:
+            if 0.0001 > i:
+                values_string.append("%0.2e" % i)
+            elif 10000 < i:
+                values_string.append("%0.2e" % i)
+            else:
+                values_string.append(str(i))
 
         # if parameter starts with n_ e.g. n_components change title to 'no. of components', xaxis to 'components'
         if key_title.startswith("n_"):
@@ -197,8 +275,12 @@ class kfold(BaseCrossVal):
         fig1_xrange = (min(cv) - max(0.1 * (min(cv)), 0.07), max(cv) + max(0.1 * (max(cv)), 0.07))
         fig1_title = diff_text + " vs. " + cv_text
 
+        # Plot width/height
+        width = int(485 * scale)
+        height = int(405 * scale)
+
         # Figure 1 (DIFFERENCE (R2 - Q2) vs. Q2)
-        fig1 = figure(x_axis_label=cv_text, y_axis_label=diff_text, title=fig1_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=fig1_yrange, x_range=fig1_xrange, plot_width=485, plot_height=405)
+        fig1 = figure(x_axis_label=cv_text, y_axis_label=diff_text, title=fig1_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=fig1_yrange, x_range=fig1_xrange, plot_width=width, plot_height=height)
 
         # Figure 1: Add a line
         fig1_line = fig1.line(cv, diff, line_width=2, line_color="black", line_alpha=0.25)
@@ -229,7 +311,7 @@ class kfold(BaseCrossVal):
 
         # Figure 2: full/cv
         fig2_title = full_text + " & " + cv_text + " vs. " + key_title
-        fig2 = figure(x_axis_label=key_xaxis, y_axis_label="Value", title=fig2_title, plot_width=485, plot_height=405, x_range=pd.unique(values_string), tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
+        fig2 = figure(x_axis_label=key_xaxis, y_axis_label="Value", title=fig2_title, plot_width=width, plot_height=height, x_range=pd.unique(values_string), tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
 
         # Figure 2: add full
         fig2_line_full = fig2.line(values_string, full, line_color="red", line_width=2)
@@ -262,6 +344,10 @@ class kfold(BaseCrossVal):
             fig2.title.text_font_size = "10pt"
             fig2.xaxis.axis_label_text_font_size = "9pt"
             fig2.yaxis.axis_label_text_font_size = "9pt"
+
+        # Rotate
+        if rotate_xlabel is True:
+            fig2.xaxis.major_label_orientation = np.pi / 2
 
         # Figure 2: legend
         if metric is "r2q2":
@@ -305,8 +391,18 @@ class kfold(BaseCrossVal):
         param_values = []
         for key, value in sorted(self.param_dict2.items()):
             param_keys.append(key)
-            value_to_string = list(map(str, value))
-            param_values.append(value_to_string)
+            # value_to_string = list(map(str, value))
+            # param_values.append(value_to_string)
+            values_string = []
+            for i in value:
+                if 0.0001 > i:
+                    values_string.append("%0.2e" % i)
+                elif 10000 < i:
+                    values_string.append("%0.2e" % i)
+                else:
+                    values_string.append(str(i))
+
+            param_values.append(values_string)
 
         # Get key/value combinations
         comb = list(product(param_values[0], param_values[1]))
