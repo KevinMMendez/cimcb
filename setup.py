@@ -11,7 +11,7 @@ setup(
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
     url="https://github.com/KevinMMendez/cimcb",
     packages=["cimcb", "cimcb.bootstrap", "cimcb.cross_val", "cimcb.model", "cimcb.plot", "cimcb.utils"],
-    install_requires=["bokeh>=1.0.0",
+    install_requires=["bokeh",
                       "keras",
                       "numpy",
                       "pandas",
