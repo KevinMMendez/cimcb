@@ -1,6 +1,6 @@
 package:
   name: cimcb
-  version: 0.0.8
+  version: 0.0.9
 
 source:
   path: ../
@@ -13,10 +13,9 @@ build:
 requirements:
   build:
     - setuptools
-    - python >=3.5
     - bokeh >=1.0.0
     - keras
-    - numpy >=1.12
+    - numpy 
     - pandas
     - scipy
     - scikit-learn
@@ -27,10 +26,9 @@ requirements:
     - xlrd
 
   run:
-    - python >=3.5
     - bokeh >=1.0.0
     - keras
-    - numpy >=1.12
+    - numpy 
     - pandas
     - scipy
     - scikit-learn
