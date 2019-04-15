@@ -13,20 +13,20 @@ build:
 requirements:
   build:
     - setuptools
-    - bokeh >=1.0.0
+    - bokeh 
     - keras
     - numpy 
     - pandas
     - scipy
     - scikit-learn
     - statsmodels
-    - python >=3.5
+    - python 
     - tensorflow
     - tqdm
     - xlrd
 
   run:
-    - bokeh >=1.0.0
+    - bokeh 
     - keras
     - numpy 
     - pandas
