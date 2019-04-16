@@ -96,7 +96,7 @@ class kfold(BaseCrossVal):
                 epoch_list.append(v - 1)
 
         # Split into train and test
-        ypred_cv_i = [np.zeros(len(self.Y))] * len(epoch_list)
+        ypred_cv_i = np.zeros((len(self.Y), len(epoch_list)))
         for i in tqdm(range(len(fold_split)), desc="Kfold"):
             train, test = fold_split[i]
             X_train = self.X[train, :]
@@ -106,11 +106,40 @@ class kfold(BaseCrossVal):
             # Full
             model_i.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
             ypred_cv_i_j = model_i.epoch.Y_test
-            for i in range(len(epoch_list)):
-                # Return value to y_pred_cv in the correct position # Better way to do this
-                for (idx, val) in zip(test, ypred_cv_i_j[epoch_list[i]]):
-                    ypred_cv_i[i][idx] = val.tolist()
-        self.ypred_cv = ypred_cv_i
+            for j in range(len(epoch_list)):
+                ypred_ypred = ypred_cv_i_j[epoch_list[j]]
+                for (idx, val) in zip(test, ypred_ypred):
+                    ypred_cv_i[idx, j] = val.tolist()
+
+        self.ypred_cv = []
+        for i in range(len(ypred_cv_i.T)):
+            self.ypred_cv.append(ypred_cv_i[:, i])
+
+        # ypred_cv_i = [None] * len(self.Y)
+        # for i in tqdm(range(len(fold_split)), desc="Kfold"):
+        #     train, test = fold_split[i]
+        #     X_train = self.X[train, :]
+        #     Y_train = self.Y[train]
+        #     X_test = self.X[test, :]
+        #     Y_test = self.Y[test]
+        #     # Full
+        #     model_i.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
+        #     ypred_cv_i_j = model_i.epoch.Y_test
+        #     for (idx, val) in zip(test, ypred_cv_i_j):
+        #         ypred_cv_i[idx] = val.tolist()
+        # self.ypred_cv = ypred_cv_i
+
+        # Put ypred into standard format
+        Y_full = self.ypred_full.copy()
+        Y_cv = self.ypred_cv.copy()
+        self.ypred_full = []
+        # self.ypred_cv = []
+        for i in epoch_list:
+            ypred_full_i = Y_full[i]
+            # ypred_full_i = Y_cv[i]
+            # Append ypred to full/cv
+            self.ypred_full.append(ypred_full_i)
+            # self.ypred_cv.append(ypred_cv_i)
 
         # self.ypred_cv = []
         # for i in epoch_list:
