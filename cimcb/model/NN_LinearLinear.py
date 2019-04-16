@@ -13,7 +13,7 @@ class NN_LinearLinear(BaseModel):
     parametric = False
     bootlist = None
 
-    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
+    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="mean_squared_error", batch_size=None, verbose=0):
         self.n_nodes = n_nodes
         self.verbose = verbose
         self.n_epochs = epochs

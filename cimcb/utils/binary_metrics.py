@@ -40,7 +40,10 @@ def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True, k=None):
         raise ValueError("y_true should only contain 0s and 1s")
 
     # Get confusion matrix
-    y_pred_round = np.where(y_pred_arr >= cut_off, 1, 0)
+    try:
+        y_pred_round = np.where(y_pred_arr >= cut_off, 1, 0)
+    except RuntimeWarning:
+        raise ValueError("Kevin: This warning says there are nans. Something is not right if y predicted are nans.")
     tn, fp, fn, tp = confusion_matrix(y_true_arr, y_pred_round).ravel()
 
     # Binary statistics dictionary
@@ -49,7 +52,12 @@ def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True, k=None):
         stats["R²"] = 1 - (sum((y_true_arr - y_pred_arr) ** 2) / sum((y_true_arr - np.mean(y_true_arr)) ** 2))
     else:
         stats["R²"] = np.nan
-    stats["AUC"] = roc_auc_score(y_true_arr, y_pred_arr)
+
+    try:
+        stats["AUC"] = roc_auc_score(y_true_arr, y_pred_arr)
+    except ValueError:
+        raise ValueError("Kevin: This error says there are nans. Something is not right if y predicted are nans.")
+
     stats["ACCURACY"] = safe_div((tp + tn), (tp + tn + fp + fn))
     stats["PRECISION"] = safe_div((tp), (tp + fp))
     stats["SENSITIVITY"] = safe_div((tp), (tp + fn))
@@ -65,7 +73,7 @@ def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True, k=None):
         stats["AIC"] = 0
         stats["BIC"] = 0
     else:
-        stats["SSE"] = np.log(rss)
+        stats["SSE"] = rss / n
         if k is None:
             stats["AIC"] = 0
             stats["BIC"] = 0
