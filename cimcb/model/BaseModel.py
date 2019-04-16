@@ -207,7 +207,7 @@ class BaseModel(ABC):
         title_bokeh = "<h3>{}</h3>".format(title)
 
         # Combine table, violin plot and roc plot into one figure
-        fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]], toolbar_location="right")
+        fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]], toolbar_location="right")
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
