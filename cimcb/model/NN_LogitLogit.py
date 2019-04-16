@@ -6,6 +6,9 @@ from keras.layers import Dense
 from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
+# Ignore tf warning
+import tensorflow.python.util.deprecation as deprecation
+deprecation._PRINT_DEPRECATION_WARNINGS = False
 
 class NN_LogitLogit(BaseModel):
     """2 Layer logistic-logistic neural network using Keras"""
