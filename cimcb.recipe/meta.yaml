@@ -25,7 +25,6 @@ requirements:
     - tensorflow
     - tqdm
     - xlrd
-    - multiprocessing
     - joblib
 
   run:
@@ -40,7 +39,6 @@ requirements:
     - tensorflow
     - tqdm
     - xlrd
-    - multiprocessing
     - joblib
 
 about:
