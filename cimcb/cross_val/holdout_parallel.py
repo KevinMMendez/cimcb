@@ -42,7 +42,7 @@ class holdout_parallel(BaseCrossVal):
     Plot: Creates a R2/Q2 plot.
     """
 
-    def __init__(self, model, X, Y, param_dict, split=0.8, random_state=None, stratify=True, folds=None, n_cores=-1):
+    def __init__(self, model, X, Y, param_dict, test_size=0.2, random_state=None, stratify=True, folds=None, n_cores=-1):
         for key, value in param_dict.items():
             if not isinstance(value, (list, tuple, np.ndarray)):
                 param_dict[key] = [value]
@@ -55,7 +55,7 @@ class holdout_parallel(BaseCrossVal):
             self.stratify = None
 
         self.random_state = random_state
-        self.split = split
+        self.test_size = test_size
         self.param_dict2 = {}
         for key, value in param_dict.items():
             if len(value) > 1:
@@ -68,7 +68,7 @@ class holdout_parallel(BaseCrossVal):
     def calc_ypred(self):
         """Calculates ypred full and ypred cv."""
 
-        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=(1 - self.split), random_state=self.random_state, stratify=self.stratify)
+        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=self.test_size, random_state=self.random_state, stratify=self.stratify)
 
         # Start Timer
         start = timeit.default_timer()
