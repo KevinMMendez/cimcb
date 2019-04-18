@@ -1,22 +1,21 @@
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
-import timeit
 import math
+from joblib import Parallel, delayed
 import multiprocessing
-from sklearn.model_selection import StratifiedKFold
+import timeit
 from sklearn import preprocessing
 from bokeh.layouts import gridplot
 from bokeh.plotting import figure, output_notebook, show
 from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine
 from tqdm import tqdm
 from itertools import product
-from sklearn.model_selection import ParameterGrid
+from sklearn.model_selection import ParameterGrid, train_test_split
 from .BaseCrossVal import BaseCrossVal
 from ..utils import binary_metrics, dict_mean
 
 
-class kfold_parallel(BaseCrossVal):
+class holdout_parallel(BaseCrossVal):
     """ Exhaustitive search over param_dict calculating binary metrics.
 
     Parameters
@@ -33,11 +32,8 @@ class kfold_parallel(BaseCrossVal):
     param_dict : dict
         List of attributes to calculate and return bootstrap confidence intervals.
 
-    folds: : a positive integer, (default 10)
-        The number of folds used in the computation.
-
-    bootnum : a positive integer, (default 100)
-        The number of bootstrap samples used in the computation for the plot.
+    split: : a positive number between 0 and 1, (default 0.8)
+        The split for the train and test split.
 
     Methods
     -------
@@ -46,13 +42,20 @@ class kfold_parallel(BaseCrossVal):
     Plot: Creates a R2/Q2 plot.
     """
 
-    def __init__(self, model, X, Y, param_dict, folds=10, n_cores=-1):
+    def __init__(self, model, X, Y, param_dict, split=0.8, random_state=None, stratify=True, folds=None, n_cores=-1):
         for key, value in param_dict.items():
             if not isinstance(value, (list, tuple, np.ndarray)):
                 param_dict[key] = [value]
 
-        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds)
-        self.crossval_idx = StratifiedKFold(n_splits=folds)
+        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict)
+        # self.crossval_idx = StratifiedKFold(n_splits=folds)
+        if stratify is True:
+            self.stratify = Y
+        else:
+            self.stratify = None
+
+        self.random_state = random_state
+        self.split = split
         self.param_dict2 = {}
         for key, value in param_dict.items():
             if len(value) > 1:
@@ -64,6 +67,8 @@ class kfold_parallel(BaseCrossVal):
 
     def calc_ypred(self):
         """Calculates ypred full and ypred cv."""
+
+        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=(1 - self.split), random_state=self.random_state, stratify=self.stratify)
 
         # Start Timer
         start = timeit.default_timer()
@@ -77,88 +82,53 @@ class kfold_parallel(BaseCrossVal):
             self.n_cores = max_num_cores
             print("Number of cores set to: {}".format(max_num_cores))
 
-        # Loop over parameter_list
+         # Loop over parameter_list
         def processInput(i):
+            # Empty list
+            ypred_full_i = []
+            ypred_cv_i = []
             # Set hyper - parameters
             params_i = self.param_list[i]
             model_i = self.model()
             model_i.set_params(params_i)
-            # Full
-            model_i.train(self.X, self.Y)
-            ypred_full_i = model_i.test(self.X)
-            ypred_full = ypred_full_i
-            # CV (for each fold)
-            ypred_cv_i = self._calc_cv_ypred(model_i, self.X, self.Y)
-            ypred_cv = ypred_cv_i
-            ypred = [ypred_full, ypred_cv]
-            return ypred
+            # Split into train and test
+            ypred_full_i = model_i.train(X_train, Y_train)
+            ypred_cv_i = model_i.test(X_test)
+            # Get ypred full cv
+            ypred_full = [[Y_train, ypred_full_i]]
+            ypred_cv = [[Y_test, ypred_cv_i]]
+            k = model_i.k
+            ypredcvfull = [ypred_full, ypred_cv, k]
+            return ypredcvfull
 
         ypred_fullcv = Parallel(n_jobs=self.n_cores)(delayed(processInput)(i) for i in tqdm(range(len(self.param_list))))
         self.ypred_full = []
         self.ypred_cv = []
+        self.k = []
         for i in ypred_fullcv:
             self.ypred_full.append(i[0])
             self.ypred_cv.append(i[1])
+            self.k.append(i[2])
         stop = timeit.default_timer()
         self.parallel_time = stop - start
         print("Time: ", self.parallel_time)
 
-        # @njit(parallel=True)
-        # @numba.njit(nopython=True)
-        # start = timeit.default_timer()
-        # @autojit(parallel=True)
-        # def parallel_calc_ypred(A):
-        #     ypred_full = [None] * len(A.param_list)
-        #     ypred_cv = [None] * len(A.param_list)
-
-        #     for params in prange(len(A.param_list)):
-        #         # Set hyper - parameters
-        #         params_i = A.param_list[params]
-        #         model_i = A.model()
-        #         model_i.set_params(params_i)
-        #         # Full
-        #         model_i.train(A.X, A.Y)
-        #         ypred_full_i = model_i.test(A.X)
-        #         ypred_full[params] = ypred_full_i
-        #         # CV (for each fold)
-        #         ypred_cv_i = A._calc_cv_ypred(model_i, A.X, A.Y)
-        #         ypred_cv[params] = ypred_cv_i
-
-        #         print(params)
-        #     return ypred_full, ypred_cv
-
-        # self.ypred_full, self.ypred_cv = parallel_calc_ypred(self)
-        # stop = timeit.default_timer()
-        # print("Time: ", stop - start)
-
-        # for params in tqdm(range(len(self.param_list)), desc="Kfold"):
-        #     # Set hyper-parameters
-        #     params_i = self.param_list[params]
-        #     model_i = self.model(**params_i)
-        #     # Full
-        #     model_i.train(self.X, self.Y)
-        #     ypred_full_i = model_i.test(self.X)
-        #     self.ypred_full.append(ypred_full_i)
-        #     # CV (for each fold)
-        #     ypred_cv_i = self._calc_cv_ypred(model_i, self.X, self.Y)
-        #     self.ypred_cv.append(ypred_cv_i)
-
     def calc_ypred_epoch(self):
         """Calculates ypred full and ypred cv for each epoch (edge case)."""
-        self.ypred_cv = []
+        # Store Ypred
+        Y_full = []
+        Y_cv = []
+        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=(1 - self.split), random_state=self.random_state, stratify=self.stratify)
+
         # Set hyper-parameters
         param = self.param_list[-1]
-        model_i = self.model(**param)
+        model = self.model(**param)
 
-        # Full
-        model_i.train(self.X, self.Y, epoch_ypred=True, epoch_xtest=None)
-        self.ypred_full = model_i.epoch.Y_train
-
-        # CV
-        # Get crossval train + test
-        fold_split = []
-        for train, test in self.crossval_idx.split(self.X, self.Y):
-            fold_split.append((train, test))
+        model.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
+        Y_full_split = model.epoch.Y_train
+        Y_full.append([Y_train, Y_full_split])
+        Y_cv_split = model.epoch.Y_test
+        Y_cv.append([Y_test, Y_cv_split])
 
         # Put ypred into standard format
         epoch_list = []
@@ -166,63 +136,45 @@ class kfold_parallel(BaseCrossVal):
             for k, v in i.items():
                 epoch_list.append(v - 1)
 
-        # Split into train and test
-        ypred_cv_i = np.zeros((len(self.Y), len(epoch_list)))
-        for i in tqdm(range(len(fold_split)), desc="Kfold"):
-            train, test = fold_split[i]
-            X_train = self.X[train, :]
-            Y_train = self.Y[train]
-            X_test = self.X[test, :]
-            Y_test = self.Y[test]
-            # Full
-            model_i.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
-            ypred_cv_i_j = model_i.epoch.Y_test
-            for j in range(len(epoch_list)):
-                ypred_ypred = ypred_cv_i_j[epoch_list[j]]
-                for (idx, val) in zip(test, ypred_ypred):
-                    ypred_cv_i[idx, j] = val.tolist()
-
-        self.ypred_cv = []
-        for i in range(len(ypred_cv_i.T)):
-            self.ypred_cv.append(ypred_cv_i[:, i])
-
-        # Put ypred into standard format
-        Y_full = self.ypred_full.copy()
-        Y_cv = self.ypred_cv.copy()
         self.ypred_full = []
-        # self.ypred_cv = []
+        self.ypred_cv = []
         for i in epoch_list:
-            ypred_full_i = Y_full[i]
-            # ypred_full_i = Y_cv[i]
+            ypred_full_i = []
+            ypred_cv_i = []
+            # for j in range(self.folds):
+            ypred_full_i.append([Y_full[0][0], Y_full[0][1][i]])
+            ypred_cv_i.append([Y_cv[0][0], Y_cv[0][1][i]])
             # Append ypred to full/cv
             self.ypred_full.append(ypred_full_i)
-            # self.ypred_cv.append(ypred_cv_i)
-
-        # self.ypred_cv = []
-        # for i in epoch_list:
-        #     ypred_cv_i = []
-        #     for j in range(self.folds):
-        #         ypred_cv_i.append([Y_cv[j][0], Y_cv[j][1][i]])
-        #     # Append ypred to full/cv
-        #     self.ypred_full.append(ypred_full_i)
-        #     self.ypred_cv.append(ypred_cv_i)
+            self.ypred_cv.append(ypred_cv_i)
 
         # delete k later
         self.k = []
         for i in epoch_list:
-            self.k.append(model_i.k)
+            self.k.append(model.k)
 
     def calc_stats(self):
         """Calculates binary statistics from ypred full and ypred cv."""
         stats_list = []
         for i in range(len(self.param_list)):
-            # Create dictionaries with binary_metrics
-            # print(self.ypred_full[i])
-            stats_full_i = binary_metrics(self.Y, self.ypred_full[i], parametric=self.model.parametric)
-            stats_cv_i = binary_metrics(self.Y, self.ypred_cv[i], parametric=self.model.parametric)
+            # Get all binary metrics
+            full_loop = []
+            cv_loop = []
+            for j in range(len(self.ypred_full[i])):
+                full = binary_metrics(self.ypred_full[i][j][0], self.ypred_full[i][j][1], parametric=self.model.parametric, k=self.k[i])
+                cv = binary_metrics(self.ypred_cv[i][j][0], self.ypred_cv[i][j][1], parametric=self.model.parametric, k=self.k[i])
+                full_loop.append(full)
+                cv_loop.append(cv)
+
+            # Average binary metrics
+            # stats_full_i = dict_mean(full_loop)
+            # stats_cv_i = dict_mean(cv_loop)
+            stats_full_i = full_loop
+            stats_cv_i = cv_loop
+
             # Rename columns
-            stats_full_i = {k + "full": v for k, v in stats_full_i.items()}
-            stats_cv_i = {k + "cv": v for k, v in stats_cv_i.items()}
+            stats_full_i = {k + "full": v for k, v in stats_full_i[0].items()}
+            stats_cv_i = {k + "cv": v for k, v in stats_cv_i[0].items()}
             stats_cv_i["R²"] = stats_full_i.pop("R²full")
             stats_cv_i["Q²"] = stats_cv_i.pop("R²cv")
             # Combine and append
@@ -230,49 +182,6 @@ class kfold_parallel(BaseCrossVal):
             stats_list.append(stats_combined)
         self.table = self._format_table(stats_list)  # Transpose, Add headers
         return self.table
-
-    def run(self):
-        """Runs all functions prior to plot."""
-        # Check that param_dict is not for epochs
-        # Epoch is a special case
-        check_epoch = []
-        for i in self.param_dict2.keys():
-            check_epoch.append(i)
-        if check_epoch == ["epochs"]:
-            # Get epoch max
-            epoch_list = []
-            for i in self.param_list2:
-                for k, v in i.items():
-                    epoch_list.append(v)
-            # Print and Calculate
-            self.calc_ypred_epoch()
-            print("returning stats at 'x' epoch interval during training until epoch={}.".format(epoch_list[-1]))
-        else:
-            self.calc_ypred()
-        self.calc_stats()
-
-    def _calc_cv_ypred(self, model_i, X, Y):
-        """Method used to calculate ypred cv."""
-        ypred_cv_i = [None] * len(Y)
-        for train, test in self.crossval_idx.split(self.X, self.Y):
-            X_train = X[train, :]
-            Y_train = Y[train]
-            X_test = X[test, :]
-            model_i.train(X_train, Y_train)
-            ypred_cv_i_j = model_i.test(X_test)
-            # Return value to y_pred_cv in the correct position # Better way to do this
-            for (idx, val) in zip(test, ypred_cv_i_j):
-                ypred_cv_i[idx] = val.tolist()
-        return ypred_cv_i
-
-    def _format_table(self, stats_list):
-        """Make stats pretty (pandas table -> proper names in columns)."""
-        table = pd.DataFrame(stats_list).T
-        param_list_string = []
-        for i in range(len(self.param_list)):
-            param_list_string.append(str(self.param_list[i]))
-        table.columns = param_list_string
-        return table
 
     def run(self):
         """Runs all functions prior to plot."""

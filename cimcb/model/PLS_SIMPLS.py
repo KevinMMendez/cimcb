@@ -42,6 +42,9 @@ class PLS_SIMPLS(BaseModel):
         self.n_component = n_components
         self.k = n_components
 
+    def set_params(self, params):
+        self.__init__(**params)
+
     def train(self, X, Y):
         """ Fit the PLS model, save additional stats (as attributes) and return Y predicted values.
 
@@ -266,7 +269,7 @@ class PLS_SIMPLS(BaseModel):
             # Deflate Cov
             vim = vi * np.matmul(vi.T, Cov)
             Cov = Cov - vim.reshape(len(vim), 1)
-            Vi = V[:, 0 : i + 1]
+            Vi = V[:, 0: i + 1]
             Vim = np.dot(Vi, np.matmul(Vi.T, Cov)).flatten()
             Cov = Cov - Vim.reshape(len(Vim), 1)
 

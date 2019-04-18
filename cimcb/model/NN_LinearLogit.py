@@ -3,6 +3,8 @@ from keras.callbacks import Callback
 from keras.optimizers import SGD
 from keras.models import Sequential
 from keras.layers import Dense
+import tensorflow as tf
+from keras import backend as K
 from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
@@ -41,6 +43,11 @@ class NN_LinearLogit(BaseModel):
         y_pred_train : array-like, shape = [n_samples, 1]
             Predicted y score for samples.
         """
+
+        # # If using Keras, set tf to 1 core
+        # config = K.tf.ConfigProto(intra_op_parallelism_threads=8, inter_op_parallelism_threads=8, allow_soft_placement=True)
+        # session = tf.Session(config=config)
+        # K.set_session(session)
 
         # If batch-size is None:
         if self.batch_size is None:

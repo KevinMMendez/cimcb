@@ -6,6 +6,7 @@ from keras.layers import Dense
 from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
+
 class NN_LinearLinear(BaseModel):
     """2 Layer linear-linear neural network using Keras"""
 
@@ -20,6 +21,9 @@ class NN_LinearLinear(BaseModel):
         self.batch_size = batch_size
         self.loss = loss
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
+
+    def set_params(self, params):
+        self.__init__(**params)
 
     def train(self, X, Y, epoch_ypred=False, epoch_xtest=None):
         """ Fit the neural network model, save additional stats (as attributes) and return Y predicted values.

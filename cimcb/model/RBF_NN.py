@@ -16,6 +16,9 @@ class RBF_NN(BaseModel):
         self.max_iter = max_iter
         self.k = n_clusters
 
+    def set_params(self, params):
+        self.__init__(**params)
+
     def train(self, X, Y):
         """ Fit the rbf-nn model, save additional stats (as attributes) and return Y predicted values.
 

@@ -36,6 +36,9 @@ class PCR(BaseModel):
         self.regrmodel = LinearRegression()
         self.k = n_components
 
+    def set_params(self, params):
+        self.__init__(**params)
+
     def train(self, X, Y):
         """ Fit the PCR model, save additional stats (as attributes) and return Y predicted values.
 
