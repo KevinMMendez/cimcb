@@ -1,6 +1,6 @@
 package:
   name: cimcb
-  version: 0.0.14
+  version: 0.0.15
 
 source:
   path: ../
@@ -25,6 +25,9 @@ requirements:
     - tensorflow
     - tqdm
     - xlrd
+    - timeit
+    - multiprocessing
+    - joblib
 
   run:
     - python >=3.5
@@ -38,6 +41,9 @@ requirements:
     - tensorflow
     - tqdm
     - xlrd
+    - timeit
+    - multiprocessing
+    - joblib
 
 about:
   home: https://github.com/CIMCB
