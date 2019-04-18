@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="cimcb",
-    version="0.0.14",
+    version="0.0.15",
     description="This is a pre-release.",
     long_description=long_description,
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
@@ -21,7 +21,10 @@ setup(
                       "statsmodels",
                       "tensorflow",
                       "tqdm",
-                      "xlrd"],
+                      "xlrd",
+                      "timeit",
+                      "multiprocessing",
+                      "joblib"],
     author="Kevin Mendez, David Broadhurst",
     author_email="k.mendez@ecu.edu.au, d.broadhurst@ecu.edu.au",
 )
