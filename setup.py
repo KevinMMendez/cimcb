@@ -22,7 +22,6 @@ setup(
                       "tensorflow",
                       "tqdm",
                       "xlrd",
-                      "timeit",
                       "multiprocessing",
                       "joblib"],
     author="Kevin Mendez, David Broadhurst",
