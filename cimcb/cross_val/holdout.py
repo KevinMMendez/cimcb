@@ -82,7 +82,7 @@ class holdout(BaseCrossVal):
         # Store Ypred
         Y_full = []
         Y_cv = []
-        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=(1 - self.split), random_state=self.random_state, stratify=self.stratify)
+        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=self.test_size, random_state=self.random_state, stratify=self.stratify)
 
         # Set hyper-parameters
         param = self.param_list[-1]
