@@ -1,10 +1,11 @@
 import numpy as np
 from joblib import Parallel, delayed
 import timeit
+import time
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from .BaseCrossVal import BaseCrossVal
-from ..utils import binary_metrics, dict_mean, dict_std
+from ..utils import binary_metrics, dict_perc, dict_median
 
 
 class holdout(BaseCrossVal):
@@ -34,9 +35,9 @@ class holdout(BaseCrossVal):
     Plot: Creates a R2/Q2 plot.
     """
 
-    def __init__(self, model, X, Y, param_dict, folds=None, n_mc=1, n_boot=0, n_cores=-1, test_size=0.2, stratify=True):
+    def __init__(self, model, X, Y, param_dict, folds=None, n_mc=1, n_boot=0, n_cores=-1, ci=95, test_size=0.2, stratify=True):
 
-        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores)
+        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores, ci=ci)
 
         # Save holdout specific inputs
         self.test_size = test_size
@@ -47,6 +48,8 @@ class holdout(BaseCrossVal):
 
     def calc_ypred(self):
         """Calculates ypred full and ypred cv."""
+
+        time.sleep(0.5)  # Sleep for 0.5 secs to finish printing
 
         # Start Timer
         start = timeit.default_timer()
@@ -67,11 +70,16 @@ class holdout(BaseCrossVal):
 
         # Stop timer
         stop = timeit.default_timer()
-        self.parallel_time = stop - start
-        print("Time: ", self.parallel_time)
+        self.parallel_time = (stop - start) / 60
+        print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
 
     def calc_ypred_epoch(self):
         """Calculates ypred full and ypred cv for each epoch (edge case)."""
+
+        time.sleep(0.5)  # Sleep for 0.5 secs to finish printing
+
+        # Start Timer
+        start = timeit.default_timer()
 
         # Set param to the max -> Actual loop including Monte-Carlo reps
         epoch_param = [self.param_list[-1]]
@@ -94,6 +102,11 @@ class holdout(BaseCrossVal):
                 actual_epoch = self.epoch_list[j]
                 self.ypred_full[j].append([ypred[i][0][0][0], ypred[i][0][0][1][actual_epoch]])
                 self.ypred_cv[j].append([ypred[i][1][0][0], ypred[i][1][0][1][actual_epoch]])
+
+        # Stop timer
+        stop = timeit.default_timer()
+        self.parallel_time = (stop - start) / 60
+        print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
 
     def _calc_ypred_loop(self, i):
         """Core component of calc_ypred."""
@@ -146,8 +159,8 @@ class holdout(BaseCrossVal):
                 cv_loop.append(cv_mc)
 
             # Average binary metrics
-            stats_full_i = dict_mean(full_loop)
-            stats_cv_i = dict_mean(cv_loop)
+            stats_full_i = dict_median(full_loop)
+            stats_cv_i = dict_median(cv_loop)
 
             # Rename columns
             stats_full_i = {k + "full": v for k, v in stats_full_i.items()}
@@ -161,8 +174,8 @@ class holdout(BaseCrossVal):
 
             # Keep std if n_mc > 1
             if self.n_mc > 1:
-                std_full_i = dict_std(full_loop)
-                std_cv_i = dict_std(cv_loop)
+                std_full_i = dict_perc(full_loop, ci=self.ci)
+                std_cv_i = dict_perc(cv_loop, ci=self.ci)
                 std_full_i = {k + "full": v for k, v in std_full_i.items()}
                 std_cv_i = {k + "cv": v for k, v in std_cv_i.items()}
                 std_cv_i["R²"] = std_full_i.pop("R²full")
@@ -174,3 +187,6 @@ class holdout(BaseCrossVal):
         if self.n_mc > 1:
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
         return self.table
+
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, model="holdout")

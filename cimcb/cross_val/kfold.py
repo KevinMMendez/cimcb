@@ -1,12 +1,13 @@
 import numpy as np
 from joblib import Parallel, delayed
 import timeit
+import time
 import multiprocessing
 from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
 from sklearn.model_selection import ParameterGrid
 from .BaseCrossVal import BaseCrossVal
-from ..utils import binary_metrics, dict_mean, dict_std
+from ..utils import binary_metrics, dict_perc, dict_median
 
 
 class kfold(BaseCrossVal):
@@ -39,12 +40,14 @@ class kfold(BaseCrossVal):
     Plot: Creates a R2/Q2 plot.
     """
 
-    def __init__(self, model, X, Y, param_dict, folds=5, n_mc=1, n_boot=0, n_cores=-1):
-        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores)
+    def __init__(self, model, X, Y, param_dict, folds=5, n_mc=1, n_boot=0, n_cores=-1, ci=95):
+        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores, ci=ci)
         self.crossval_idx = StratifiedKFold(n_splits=folds)
 
     def calc_ypred(self):
         """Calculates ypred full and ypred cv."""
+
+        time.sleep(0.5)  # Sleep for 0.5 secs to finish printing
 
         # Start Timer
         start = timeit.default_timer()
@@ -65,11 +68,16 @@ class kfold(BaseCrossVal):
 
         # Stop timer
         stop = timeit.default_timer()
-        self.parallel_time = stop - start
-        print("Time: ", self.parallel_time)
+        self.parallel_time = (stop - start) / 60
+        print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
 
     def calc_ypred_epoch(self):
         """Calculates ypred full and ypred cv for each epoch (edge case)."""
+
+        time.sleep(0.5)  # Sleep for 0.5 secs to finish printing
+
+        # Start Timer
+        start = timeit.default_timer()
 
         # Set param to the max -> Actual loop including Monte-Carlo reps
         epoch_param = [self.param_list[-1]]
@@ -91,6 +99,11 @@ class kfold(BaseCrossVal):
             for j in range(len(self.epoch_list)):
                 self.ypred_full[j].append(ypred[i][0][j])
                 self.ypred_cv[j].append(ypred[i][1][j])
+
+        # Stop timer
+        stop = timeit.default_timer()
+        self.parallel_time = (stop - start) / 60
+        print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
 
     def _calc_ypred_loop(self, i):
         """Core component of calc_ypred."""
@@ -165,8 +178,8 @@ class kfold(BaseCrossVal):
                 cv_loop.append(cv_mc)
 
             # Average binary metrics
-            stats_full_i = dict_mean(full_loop)
-            stats_cv_i = dict_mean(cv_loop)
+            stats_full_i = full_loop[1]
+            stats_cv_i = dict_median(cv_loop)
 
             # Rename columns
             stats_full_i = {k + "full": v for k, v in stats_full_i.items()}
@@ -180,8 +193,8 @@ class kfold(BaseCrossVal):
 
             # Keep std if n_mc > 1
             if self.n_mc > 1:
-                std_full_i = dict_std(full_loop)
-                std_cv_i = dict_std(cv_loop)
+                std_full_i = dict_perc(cv_loop, ci=self.ci)
+                std_cv_i = dict_perc(cv_loop, ci=self.ci)
                 std_full_i = {k + "full": v for k, v in std_full_i.items()}
                 std_cv_i = {k + "cv": v for k, v in std_cv_i.items()}
                 std_cv_i["R²"] = std_full_i.pop("R²full")
@@ -207,3 +220,6 @@ class kfold(BaseCrossVal):
             for (idx, val) in zip(test, ypred_cv_i_j):
                 ypred_cv_i[idx] = val.tolist()
         return ypred_cv_i
+
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, model="kfold")
