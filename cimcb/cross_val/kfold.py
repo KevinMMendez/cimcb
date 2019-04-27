@@ -178,7 +178,7 @@ class kfold(BaseCrossVal):
                 cv_loop.append(cv_mc)
 
             # Average binary metrics
-            stats_full_i = full_loop[1]
+            stats_full_i = full_loop[0]
             stats_cv_i = dict_median(cv_loop)
 
             # Rename columns
