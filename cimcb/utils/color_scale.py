@@ -27,10 +27,22 @@ def color_scale(x, method="linear", beta=None, alpha=1, beta_method=1):
                 stat = 1 / beta * np.tanh(beta * (alpha + i))
                 scale_i.append(stat)
             scale_x = scale_i
-        else:
+        elif beta_method == 2:
             scale_i = []
             for i in scale_x_final[:, 0]:
                 stat = 1 / beta * np.arctan(beta * (alpha + i))
+                scale_i.append(stat)
+            scale_x = scale_i
+        elif beta_method == 3:
+            scale_i = []
+            for i in scale_x_final[:, 0]:
+                stat = 1 + np.tanh(beta * (alpha + i))
+                scale_i.append(stat)
+            scale_x = scale_i
+        else:
+            scale_i = []
+            for i in scale_x_final[:, 0]:
+                stat = np.tanh(beta * (alpha + i))
                 scale_i.append(stat)
             scale_x = scale_i
         scale_x = np.array(scale_x)
