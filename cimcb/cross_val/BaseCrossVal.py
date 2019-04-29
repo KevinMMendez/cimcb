@@ -5,7 +5,6 @@ import math
 import multiprocessing
 from abc import ABC, abstractmethod
 from bokeh.layouts import gridplot
-from pscript import py2js
 from bokeh import events
 from bokeh.plotting import figure, output_notebook, show
 from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine, Patch, Patches, CustomJS, Text
