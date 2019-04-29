@@ -1,14 +1,18 @@
 import numpy as np
 import pandas as pd
+import re
 import math
 import multiprocessing
 from abc import ABC, abstractmethod
 from bokeh.layouts import gridplot
+from pscript import py2js
+from bokeh import events
 from bokeh.plotting import figure, output_notebook, show
-from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine, Patch, Patches
+from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine, Patch, Patches, CustomJS, Text
 from itertools import product
 from sklearn.model_selection import ParameterGrid
 from sklearn import preprocessing
+from ..utils import color_scale, dict_perc
 
 
 class BaseCrossVal(ABC):
@@ -98,7 +102,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, model="kfold"):
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -114,9 +118,9 @@ class BaseCrossVal(ABC):
 
         # Plot based on the number of parameters
         if len(self.param_dict2) == 1:
-            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model)
+            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, color_alpha=color_alpha, color_beta_method=color_beta_method, ci=ci)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
@@ -124,8 +128,23 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold"):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95):
         """Used for plot function if the number of parameters is 1."""
+
+        # Get ci
+        if self.n_mc > 1:
+            std_list = []
+            for i in range(len(self.param_list)):
+                std_full_i = dict_perc(self.full_loop[i], ci=ci)
+                std_cv_i = dict_perc(self.cv_loop[i], ci=ci)
+                std_full_i = {k + "full": v for k, v in std_full_i.items()}
+                std_cv_i = {k + "cv": v for k, v in std_cv_i.items()}
+                std_cv_i["R²"] = std_full_i.pop("R²full")
+                std_cv_i["Q²"] = std_cv_i.pop("R²cv")
+                std_combined = {**std_full_i, **std_cv_i}
+                std_list.append(std_combined)
+            self.table_std = self._format_table(std_list)  # Transpose, Add headers
+
         # Choose metric to plot
         metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
         metric_list = np.array(["acc", "aic", "auc", "bic", "f1score", "prec", "r2q2", "sens", "spec", "sse"])
@@ -137,7 +156,22 @@ class BaseCrossVal(ABC):
         diff = abs(full - cv)
         full_text = self.table.iloc[2 * metric_idx + 1].name
         cv_text = self.table.iloc[2 * metric_idx].name
-        diff_text = "DIFFERENCE " + "(" + full_text + " - " + cv_text + ")"
+        if metric == "r2q2":
+            diff_text = "| R²-Q² |"
+            y_axis_text = "R² & Q²"
+            full_legend = "R²"
+            cv_legend = "Q²"
+        else:
+            diff_text = full_text[:-4] + "diff"
+            y_axis_text = full_text[:-4]
+            if model == "kfold":
+                full_legend = "FULL"
+                cv_legend = "CV"
+            else:
+                full_legend = "TRAIN"
+                cv_legend = "TEST"
+                full_text = full_text[:-4] + "train"
+                cv_text = full_text[:-5] + "test"
 
         # round full, cv, and diff for hovertool
         full_hover = []
@@ -167,23 +201,33 @@ class BaseCrossVal(ABC):
 
         # if parameter starts with n_ e.g. n_components change title to 'no. of components', xaxis to 'components'
         if key_title.startswith("n_"):
-            key_title = "no. of " + key_title[2:]
-            key_xaxis = key_xaxis[2:-1]
+            key_xaxis = key_xaxis[2:]
+            key_xaxis = key_xaxis.title()
+            key_title = "no. of " + key_xaxis
+        else:
+            key_title = key_title.replace("_", " ")
+            key_title = key_title.title()
+            key_xaxis = key_title
+            # if key_xaxis.endswith("s") == True:
+            #     key_xaxis = key_xaxis[:-1]
 
         # store data in ColumnDataSource for Bokeh
         data = dict(full=full, cv=cv, diff=diff, full_hover=full_hover, cv_hover=cv_hover, diff_hover=diff_hover, values_string=values_string)
         source = ColumnDataSource(data=data)
 
-        fig1_yrange = (min(diff) - max(0.1 * (min(diff)), 0.07), max(diff) + max(0.1 * (max(diff)), 0.07))
-        fig1_xrange = (min(cv) - max(0.1 * (min(cv)), 0.07), max(cv) + max(0.1 * (max(cv)), 0.07))
+        # fig1_yrange = (min(diff) - max(0.1 * (min(diff)), 0.07), max(diff) + max(0.1 * (max(diff)), 0.07))
+        # fig1_xrange = (min(cv) - max(0.1 * (min(cv)), 0.07), max(cv) + max(0.1 * (max(cv)), 0.07))
         fig1_title = diff_text + " vs. " + cv_text
 
         # Plot width/height
         width = int(485 * scale)
         height = int(405 * scale)
+        # fig1_yrange = (min(diff) - max(0.1 * (min(diff)), 0.07), max(diff) + max(0.1 * (max(diff)), 0.07))
+        # fig1_xrange = (min(cv) - max(0.1 * (min(cv)), 0.07), max(cv) + max(0.1 * (max(cv)), 0.07))
+        # x_range=(min(cv_score) - 0.03, max(cv_score) + 0.03), y_range=(min(diff_score) - 0.03, max(diff_score) + 0.03)
 
         # Figure 1 (DIFFERENCE (R2 - Q2) vs. Q2)
-        fig1 = figure(x_axis_label=cv_text, y_axis_label=diff_text, title=fig1_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=fig1_yrange, x_range=fig1_xrange, plot_width=width, plot_height=height)
+        fig1 = figure(x_axis_label=cv_text, y_axis_label=diff_text, title=fig1_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", plot_width=width, plot_height=height, x_range=(min(cv) - 0.03, max(cv) + 0.03), y_range=(min(diff) - 0.03, max(diff) + 0.03))
 
         # Figure 1: Add a line
         fig1_line = fig1.line(cv, diff, line_width=2, line_color="black", line_alpha=0.25)
@@ -196,7 +240,7 @@ class BaseCrossVal(ABC):
         fig1_circ.nonselection_glyph.line_color = "white"
 
         # Figure 1: Add hovertool
-        fig1.add_tools(HoverTool(renderers=[fig1_circ], tooltips=[(key_xaxis, "@values_string"), (full_text, "@full_hover"), (cv_text, "@cv_hover"), ("Diff", "@diff_hover")]))
+        fig1.add_tools(HoverTool(renderers=[fig1_circ], tooltips=[(key_xaxis, "@values_string"), (full_text, "@full_hover"), (cv_text, "@cv_hover"), (diff_text, "@diff_hover")]))
 
         # Figure 1: Extra formating
         fig1.axis.major_label_text_font_size = "8pt"
@@ -210,8 +254,8 @@ class BaseCrossVal(ABC):
             fig1.yaxis.axis_label_text_font_size = "9pt"
 
         # Figure 2: full/cv
-        fig2_title = full_text + " & " + cv_text + " vs. " + key_title
-        fig2 = figure(x_axis_label=key_xaxis, y_axis_label="Value", title=fig2_title, plot_width=width, plot_height=height, x_range=pd.unique(values_string), tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
+        fig2_title = y_axis_text + " over " + key_title
+        fig2 = figure(x_axis_label=key_xaxis, y_axis_label=y_axis_text, title=fig2_title, plot_width=width, plot_height=height, x_range=pd.unique(values_string), tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
 
         # Figure 2: Add Confidence Intervals if n_mc > 1
         if self.n_mc > 1:
@@ -239,7 +283,7 @@ class BaseCrossVal(ABC):
 
         # Figure 2: add full
         fig2_line_full = fig2.line(values_string, full, line_color="red", line_width=2)
-        fig2_circ_full = fig2.circle("values_string", "full", line_color="red", fill_color="white", fill_alpha=1, size=8, source=source, legend=full_text)
+        fig2_circ_full = fig2.circle("values_string", "full", line_color="red", fill_color="white", fill_alpha=1, size=8, source=source, legend=full_legend)
         fig2_circ_full.selection_glyph = Circle(line_color="red", fill_color="white", line_width=2)
         fig2_circ_full.nonselection_glyph.line_color = "red"
         fig2_circ_full.nonselection_glyph.fill_color = "white"
@@ -247,7 +291,7 @@ class BaseCrossVal(ABC):
 
         # Figure 2: add cv
         fig2_line_cv = fig2.line(values_string, cv, line_color="blue", line_width=2)
-        fig2_circ_cv = fig2.circle("values_string", "cv", line_color="blue", fill_color="white", fill_alpha=1, size=8, source=source, legend=cv_text)
+        fig2_circ_cv = fig2.circle("values_string", "cv", line_color="blue", fill_color="white", fill_alpha=1, size=8, source=source, legend=cv_legend)
         fig2_circ_cv.selection_glyph = Circle(line_color="blue", fill_color="white", line_width=2)
         fig2_circ_cv.nonselection_glyph.line_color = "blue"
         fig2_circ_cv.nonselection_glyph.fill_color = "white"
@@ -274,10 +318,24 @@ class BaseCrossVal(ABC):
             fig2.xaxis.major_label_orientation = np.pi / 2
 
         # Figure 2: legend
-        if metric is "r2q2":
-            fig2.legend.location = "top_left"
+        if legend == None or legend == False:
+            fig2.legend.visible = False
         else:
-            fig2.legend.location = "bottom_right"
+            fig2.legend.location = legend
+            fig2.legend.location = legend
+
+        # Hide legend if it is clicked
+        # def show_hide_legend(legend=fig2.legend[0]):
+        #     legend.visible = not legend.visible
+
+        # print(py2js(show_hide_legend))
+
+        # fig2.js_on_event(events.DoubleTap, CustomJS.from_py_func(show_hide_legend))
+
+        # Center title
+        if title_align == "center":
+            fig1.title.align = "center"
+            fig2.title.align = "center"
 
         # Create a grid and output figures
         grid = np.full((1, 2), None)
@@ -286,9 +344,21 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="linear", line=False, model="kfold"):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="linear", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
 
-        # Need to sort out param_dict to be sorted alphabetically
+        # Get ci
+        if self.n_mc > 1:
+            std_list = []
+            for i in range(len(self.param_list)):
+                std_full_i = dict_perc(self.full_loop[i], ci=ci)
+                std_cv_i = dict_perc(self.cv_loop[i], ci=ci)
+                std_full_i = {k + "full": v for k, v in std_full_i.items()}
+                std_cv_i = {k + "cv": v for k, v in std_cv_i.items()}
+                std_cv_i["R²"] = std_full_i.pop("R²full")
+                std_cv_i["Q²"] = std_cv_i.pop("R²cv")
+                std_combined = {**std_full_i, **std_cv_i}
+                std_list.append(std_combined)
+            self.table_std = self._format_table(std_list)  # Transpose, Add headers
 
         metric_list = np.array(["acc", "aic", "auc", "bic", "f1score", "prec", "r2q2", "sens", "spec", "sse"])
         metric_idx = np.where(metric_list == metric)[0][0]
@@ -300,6 +370,16 @@ class BaseCrossVal(ABC):
         full_title = self.table.iloc[2 * metric_idx + 1].name
         cv_title = self.table.iloc[2 * metric_idx].name
         diff_title = full_title[:-4] + "diff"
+
+        y_axis_text = full_title[:-4]
+        if model == "kfold":
+            full_legend = "FULL"
+            cv_legend = "CV"
+        else:
+            full_legend = "TRAIN"
+            cv_legend = "TEST"
+            full_title = full_title[:-4] + "train"
+            cv_title = full_title[:-5] + "test"
 
         # round full, cv, and diff for hovertool
         full_hover = []
@@ -346,6 +426,20 @@ class BaseCrossVal(ABC):
 
             param_values.append(values_string)
 
+        param_keys_title = []
+        param_keys_axis = []
+        for i in param_keys:
+            if i.startswith("n_"):
+                i_xaxis = i[2:]
+                i_xaxis = i_xaxis.title()
+                i_title = "no. of " + i_xaxis
+            else:
+                i_title = i.replace("_", " ")
+                i_title = i_title.title()
+                i_xaxis = i_title
+            param_keys_title.append(i_title)
+            param_keys_axis.append(i_xaxis)
+
         # Get key/value combinations
         comb = list(product(param_values[0], param_values[1]))
         key0_value = [val[0] for val in comb]
@@ -356,33 +450,9 @@ class BaseCrossVal(ABC):
         param_dict = self.param_dict2
         param_list = self.param_list2
 
-        # Set-up for non-linear scaling for heatmap color
-        if color_scaling is "log":
-            scale_full_score = np.log(full_score)
-            scale_cv_score = np.log(cv_score)
-            scale_diff_score = np.log(diff_score)
-        elif color_scaling is "square":
-            scale_full_score = full_score ** 2
-            scale_cv_score = cv_score ** 2
-            scale_diff_score = diff_score ** 2
-        elif color_scaling is "square root":
-            scale_full_score = np.sqrt(full_score)
-            scale_cv_score = np.sqrt(cv_score)
-            scale_diff_score = np.sqrt(diff_score)
-        elif color_scaling is "log+1":
-            scale_full_score = np.log(full_score + 1)
-            scale_cv_score = np.log(cv_score + 1)
-            scale_diff_score = np.log(diff_score + 1)
-        else:
-            scale_full_score = full_score
-            scale_cv_score = cv_score
-            scale_diff_score = diff_score
-
-        # Basic Min_Max for heatmap (changing alpha (opaque) rather than colour)... linear from 0 to 1
-        scaler = preprocessing.MinMaxScaler(feature_range=(0.02, 1))
-        full_alpha = scaler.fit_transform(scale_full_score[:, np.newaxis])
-        cv_alpha = scaler.fit_transform(scale_cv_score[:, np.newaxis])
-        diff_alpha = scaler.fit_transform(scale_diff_score[:, np.newaxis])
+        full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta, alpha=color_alpha, beta_method=color_beta_method)
+        cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta, alpha=color_alpha, beta_method=color_beta_method)
+        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta, alpha=color_alpha, beta_method=color_beta_method)
 
         # Text for heatmaps
         full_text = []
@@ -488,9 +558,73 @@ class BaseCrossVal(ABC):
         scatter_size_key1 = scaler_size.fit_transform(np.array(size_prescale_key1)[:, np.newaxis])
         scatter_size_key1 = scatter_size_key1 * scale
 
+        # Extra
+        key0_value_text = len(key1_value) * [key1_value[-1]]
+        key1_value_text = len(key0_value) * [key0_value[-1]]
+        line1_cv_text = []
+        for i in line1_cv:
+            line1_cv_text.append(i[-1])
+        line0_cv_text = []
+        for i in line0_cv:
+            line0_cv_text.append(i[-1])
+        line1_full_text = []
+        for i in line1_full:
+            line1_full_text.append(i[-1])
+        line0_full_text = []
+        for i in line0_full:
+            line0_full_text.append(i[-1])
+
+        ptext_is = ["Learning Rate", "Nodes", "Momentum", "Decay", "Components", "Batch Size", "Gamma", "C", "Estimators", "Max Features", "Max Depth", "Min Samples Split", "Min Samples Leaf", "Max Leaf Nodes"]
+        ptext_change = ["LR", "Node", "Mom", "Dec", "Comp", "Bat", "Gam", "C", "Est", "Feat", "Dep", "SSpl", "SLea", "LNod"]
+
+        ptext = []
+        for i in param_keys_axis:
+            val = "fill"
+            for j in range(len(ptext_is)):
+                if i == ptext_is[j]:
+                    val = ptext_change[j]
+            if val == "fill":
+                val = i[:3]
+            ptext.append(val + " = ")
+
+        line1_cv_score_text = []
+        for i in key1_value:
+            line1_cv_score_text.append(ptext[1] + i)
+
+        line0_cv_score_text = []
+        for i in key0_value:
+            line0_cv_score_text.append(ptext[0] + i)
+
         diff_score_neg = 1 - diff_score
         # Store information in dictionary for bokeh
-        data = dict(key0_value=key1_value, key1_value=key0_value, full_score=full_score, cv_score=cv_score, diff_score=diff_score, diff_score_neg=diff_score_neg, full_alpha=full_alpha, cv_alpha=cv_alpha, diff_alpha=diff_alpha, line_key0_value=line_key0_value, line_key1_value=line_key1_value, line0_full=line0_full, line0_cv=line0_cv, line1_full=line1_full, line1_cv=line1_cv, full_text=full_text, cv_text=cv_text, diff_text=diff_text)
+        data = dict(
+            key0_value=key1_value,
+            key1_value=key0_value,
+            full_score=full_score,
+            cv_score=cv_score,
+            diff_score=diff_score,
+            diff_score_neg=diff_score_neg,
+            full_alpha=full_alpha,
+            cv_alpha=cv_alpha,
+            diff_alpha=diff_alpha,
+            line_key0_value=line_key0_value,
+            line_key1_value=line_key1_value,
+            line0_full=line0_full,
+            line0_cv=line0_cv,
+            line1_full=line1_full,
+            line1_cv=line1_cv,
+            full_text=full_text,
+            cv_text=cv_text,
+            diff_text=diff_text,
+            key0_value_text=key0_value_text,
+            key1_value_text=key1_value_text,
+            line0_cv_text=line0_cv_text,
+            line1_cv_text=line1_cv_text,
+            line1_cv_score_text=line1_cv_score_text,
+            line1_full_text=line1_full_text,
+            line0_full_text=line0_full_text,
+            line0_cv_score_text=line0_cv_score_text,
+        )
 
         if self.n_mc > 1:
             data["lower_ci_full"] = lower_ci_full
@@ -506,7 +640,7 @@ class BaseCrossVal(ABC):
         source = ColumnDataSource(data=data)
 
         # Heatmap FULL
-        p1 = figure(title=full_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys[0], y_axis_label=param_keys[1])
+        p1 = figure(title=full_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys_axis[0], y_axis_label=param_keys_axis[1])
 
         p1_render = p1.rect("key1_value", "key0_value", 0.9, 0.9, color="red", alpha="full_alpha", line_color=None, source=source)
 
@@ -516,7 +650,7 @@ class BaseCrossVal(ABC):
         p1_render.nonselection_glyph.line_color = "white"
 
         # Heatmap CV
-        p2 = figure(title=cv_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys[0], y_axis_label=param_keys[1])
+        p2 = figure(title=cv_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys_axis[0], y_axis_label=param_keys_axis[1])
 
         p2_render = p2.rect("key1_value", "key0_value", 0.9, 0.9, color="blue", alpha="cv_alpha", line_color=None, source=source)
 
@@ -526,7 +660,7 @@ class BaseCrossVal(ABC):
         p2_render.nonselection_glyph.line_color = "white"
 
         # Heatmap Diff
-        p3 = figure(title=diff_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys[0], y_axis_label=param_keys[1])
+        p3 = figure(title=diff_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys_axis[0], y_axis_label=param_keys_axis[1])
 
         p3_render = p3.rect("key1_value", "key0_value", 0.9, 0.9, color="green", alpha="diff_alpha", line_color=None, source=source)
 
@@ -592,8 +726,9 @@ class BaseCrossVal(ABC):
         p2.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[("AUC_CV", "@cv_text")]))
         p3.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[("AUC_diff", "@diff_text")]))
 
+        sc_title = diff_title + " vs. " + cv_title
         # Scatterplot
-        p4 = figure(title="Scatterplot (diff vs. cv)", x_axis_label=cv_title, y_axis_label=diff_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", x_range=(min(cv_score) - 0.03, max(cv_score) + 0.03), y_range=(min(diff_score) - 0.03, max(diff_score) + 0.03))
+        p4 = figure(title=sc_title, x_axis_label=cv_title, y_axis_label=diff_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", x_range=(min(cv_score) - 0.03, max(cv_score) + 0.03), y_range=(min(diff_score) - 0.03, max(diff_score) + 0.03))
 
         color_mapper_scatter = LinearColorMapper(palette="Inferno256", low=0, high=1)
 
@@ -612,7 +747,22 @@ class BaseCrossVal(ABC):
         p4.title.text_font_size = str(14 * scale) + "pt"
 
         # Line plot 1
-        p5 = figure(title="Lineplot ({})".format(param_keys[0]), x_axis_label=param_keys[0], y_axis_label="Value", plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=pd.unique(key0_unique), tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
+        l1_range_special = []
+        if len(key0_unique) > 2:
+            l1_range_special.append([" "])
+        if len(key0_unique) > 5:
+            l1_range_special.append([l1_range_special[-1][0] + " "])
+        if len(key0_unique) > 8:
+            l1_range_special.append([l1_range_special[-1][0] + " "])
+        another_val = len(key0_unique) - 8
+        if another_val > 0:
+            for i in range(another_val):
+                if i % 3 == 0:
+                    l1_range_special.append([l1_range_special[-1][0] + " "])
+        l1_xrange = pd.unique(key0_unique)
+        l1_xrange = np.append(l1_xrange, l1_range_special)
+        l1_title = y_axis_text + " over " + param_keys_title[0]
+        p5 = figure(title=l1_title, x_axis_label=param_keys_axis[0], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l1_xrange, tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
 
         if self.n_mc > 1:
             p5_render_patch2 = p5.patches("monte_line_key0_value", "monte_line1_cv", alpha=0, color="blue", source=source)
@@ -631,7 +781,7 @@ class BaseCrossVal(ABC):
         p5_render_1.nonselection_glyph.line_color = "red"
         p5_render_1.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
 
-        p5_render_2 = p5.circle("key1_value", "full_score", line_color="red", fill_color="white", size=8 * scale, source=source)
+        p5_render_2 = p5.circle("key1_value", "full_score", line_color="red", fill_color="white", size=8 * scale, source=source, legend=full_legend)
         p5_render_2.selection_glyph = Circle(line_color="red", fill_color="white")
         p5_render_2.nonselection_glyph.line_color = "red"
         p5_render_2.nonselection_glyph.fill_color = "white"
@@ -642,11 +792,23 @@ class BaseCrossVal(ABC):
         p5_render_3.nonselection_glyph.line_color = "blue"
         p5_render_3.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
 
-        p5_render_4 = p5.circle("key1_value", "cv_score", line_color="blue", fill_color="white", size=8 * scale, source=source)
+        p5_render_4 = p5.circle("key1_value", "cv_score", line_color="blue", fill_color="white", size=8 * scale, source=source, legend=cv_legend)
         p5_render_4.selection_glyph = Circle(line_color="blue", fill_color="white")
         p5_render_4.nonselection_glyph.line_color = "blue"
         p5_render_4.nonselection_glyph.fill_color = "white"
         p5_render_4.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
+
+        # text
+        text_here = 8 * scale
+        text_line_font = str(text_here) + "pt"
+        p5_render_5 = p5.text(x="key1_value_text", y="line1_cv_text", text="line1_cv_score_text", source=source, text_font_size=text_line_font, text_color="blue", x_offset=8 * scale, y_offset=6 * scale, text_alpha=0)
+        p5_render_5.selection_glyph = Text(text_color="blue", text_alpha=1, text_font_size=text_line_font)
+        p5_render_5.nonselection_glyph.text_alpha = 0
+        p5_render_6 = p5.text(x="key1_value_text", y="line1_full_text", text="line1_cv_score_text", source=source, text_font_size=text_line_font, text_color="red", x_offset=8 * scale, y_offset=6 * scale, text_alpha=0)
+        p5_render_6.selection_glyph = Text(text_color="red", text_alpha=1, text_font_size=text_line_font)
+        p5_render_6.nonselection_glyph.text_alpha = 0
+
+        # p5_render_5.selection_glyph.text_alpha = 0.6
 
         p5.add_tools(HoverTool(renderers=[p5_render_2], tooltips=[("AUC_full", "@full_text")]))
 
@@ -655,7 +817,23 @@ class BaseCrossVal(ABC):
         p5.add_tools(TapTool(renderers=[p5_render_2, p5_render_4]))
 
         # Line plot 2
-        p6 = figure(title="Lineplot ({})".format(param_keys[1]), x_axis_label=param_keys[1], y_axis_label="Value", plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=pd.unique(key1_unique), tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
+        l2_range_special = []
+        if len(key1_unique) > 2:
+            l2_range_special.append([" "])
+        if len(key1_unique) > 5:
+            l2_range_special.append([l2_range_special[-1][0] + " "])
+        if len(key1_unique) > 8:
+            l2_range_special.append([l2_range_special[-1][0] + " "])
+        another_val = len(key1_unique) - 8
+        if another_val > 0:
+            for i in range(another_val):
+                if i % 3 == 0:
+                    l2_range_special.append([l2_range_special[-1][0] + " "])
+        l2_xrange = pd.unique(key1_unique)
+        l2_xrange = np.append(l2_xrange, l2_range_special)
+        l1_title = y_axis_text + " over " + param_keys_title[0]
+        l2_title = y_axis_text + " over " + param_keys_title[1]
+        p6 = figure(title=l2_title, x_axis_label=param_keys_axis[1], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l2_xrange, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
 
         if self.n_mc > 1:
             p6_render_patch2 = p6.patches("monte_line_key1_value", "monte_line0_cv", alpha=0, color="blue", source=source)
@@ -669,7 +847,7 @@ class BaseCrossVal(ABC):
                 p6_render_patch1.nonselection_glyph.fill_alpha = 0
                 p6_render_patch1.nonselection_glyph.line_color = "white"
 
-        p6_render_1 = p6.multi_line("line_key1_value", "line0_full", line_color="red", line_width=2 * scale, source=source)
+        p6_render_1 = p6.multi_line("line_key1_value", "line0_full", line_color="red", line_width=2 * scale, source=source, legend=full_legend)
         p6_render_1.selection_glyph = MultiLine(line_color="red", line_alpha=0.8, line_width=2 * scale)
         p6_render_1.nonselection_glyph.line_color = "red"
         p6_render_1.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
@@ -680,7 +858,7 @@ class BaseCrossVal(ABC):
         p6_render_2.nonselection_glyph.fill_color = "white"
         p6_render_2.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
 
-        p6_render_3 = p6.multi_line("line_key1_value", "line0_cv", line_color="blue", line_width=2 * scale, source=source)
+        p6_render_3 = p6.multi_line("line_key1_value", "line0_cv", line_color="blue", line_width=2 * scale, source=source, legend=cv_legend)
         p6_render_3.selection_glyph = MultiLine(line_color="blue", line_alpha=0.8, line_width=2 * scale)
         p6_render_3.nonselection_glyph.line_color = "blue"
         p6_render_3.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
@@ -691,11 +869,38 @@ class BaseCrossVal(ABC):
         p6_render_4.nonselection_glyph.fill_color = "white"
         p6_render_4.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
 
+        # Text
+        text_here = 8 * scale
+        text_line_font = str(text_here) + "pt"
+        p6_render_5 = p6.text(x="key0_value_text", y="line0_cv_text", text="line0_cv_score_text", source=source, text_font_size=text_line_font, text_color="blue", x_offset=8 * scale, y_offset=6 * scale, text_alpha=0)
+        p6_render_5.selection_glyph = Text(text_color="blue", text_alpha=1, text_font_size=text_line_font)
+        p6_render_5.nonselection_glyph.text_alpha = 0
+        p6_render_6 = p6.text(x="key0_value_text", y="line0_full_text", text="line0_cv_score_text", source=source, text_font_size=text_line_font, text_color="red", x_offset=8 * scale, y_offset=6 * scale, text_alpha=0)
+        p6_render_6.selection_glyph = Text(text_color="red", text_alpha=1, text_font_size=text_line_font)
+        p6_render_6.nonselection_glyph.text_alpha = 0
+
         p6.add_tools(HoverTool(renderers=[p6_render_2], tooltips=[("AUC_full", "@full_text")]))
 
         p6.add_tools(HoverTool(renderers=[p6_render_4], tooltips=[("AUC_CV", "@cv_text")]))
 
         p6.add_tools(TapTool(renderers=[p6_render_2, p6_render_4]))
+
+        # Figure: legend
+        if legend == None or legend == False:
+            p5.legend.visible = False
+            p6.legend.visible = False
+        else:
+            p5.legend.location = legend
+            p6.legend.location = legend
+
+        # Center title
+        if title_align == "center":
+            p1.title.align = "center"
+            p2.title.align = "center"
+            p3.title.align = "center"
+            p4.title.align = "center"
+            p5.title.align = "center"
+            p6.title.align = "center"
 
         fig = gridplot([[p1, p2, p3], [p4, p5, p6]], merge_tools=True, toolbar_location="left", toolbar_options=dict(logo=None))
 
@@ -708,5 +913,19 @@ class BaseCrossVal(ABC):
         p4.title.text_font_size = str(12 * scale) + "pt"
         p5.title.text_font_size = str(12 * scale) + "pt"
         p6.title.text_font_size = str(12 * scale) + "pt"
+
+        p1.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p2.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p3.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p4.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p5.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p6.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+
+        p1.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p2.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p3.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p4.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p5.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+        p6.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
 
         return fig

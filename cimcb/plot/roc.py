@@ -1,5 +1,7 @@
 import numpy as np
 from bokeh.models import Band, HoverTool
+from tqdm import tqdm
+from copy import deepcopy, copy
 from bokeh.plotting import ColumnDataSource, figure
 from scipy import interp
 from sklearn import metrics
@@ -134,6 +136,105 @@ def roc_calculate(Ytrue, Yscore, bootnum=1000, metric=None, val=None, parametric
         # Resample and get tpr, fpr
         Ytrue_res, Yscore_res = resample(Ytrue, Yscore)
         fpr_res, tpr_res, threshold_res = metrics.roc_curve(Ytrue_res, Yscore_res, pos_label=1, drop_intermediate=False)
+
+        # Drop intermediates when fpr=0
+        tpr0_res = tpr_res[fpr_res == 0][-1]
+        tpr_res = np.concatenate([[tpr0_res], tpr_res[fpr_res > 0]])
+        fpr_res = np.concatenate([[0], fpr_res[fpr_res > 0]])
+
+        # Vertical averaging... use closest fpr_res to fpr, and append the corresponding tpr
+        idx = [np.abs(i - fpr_res).argmin() for i in fpr]
+        tpr_list = tpr_res[idx]
+        tpr_boot.append(tpr_list)
+
+        # if metric is provided, calculate stats
+        if metric is not None:
+            stats_res = get_stats(Ytrue_res, Yscore_res, specificity, parametric)
+            boot_stats.append(stats_res)
+
+    # Get CI for bootstat
+    if metric is not None:
+        bootci_stats = {}
+        for i in boot_stats[0].keys():
+            stats_i = [k[i] for k in boot_stats]
+            stats_i = np.array(stats_i)
+            stats_i = stats_i[~np.isnan(stats_i)]  # Remove nans
+            try:
+                lowci = np.percentile(stats_i, 2.5)
+                uppci = np.percentile(stats_i, 97.5)
+            except IndexError:
+                lowci = np.nan
+                uppci = np.nan
+            bootci_stats[i] = [lowci, uppci]
+
+    # Get CI for tpr
+    tpr_lowci = np.percentile(tpr_boot, 2.5, axis=0)
+    tpr_uppci = np.percentile(tpr_boot, 97.5, axis=0)
+
+    # Add the starting 0
+    tpr = np.insert(tpr, 0, 0)
+    fpr = np.insert(fpr, 0, 0)
+    tpr_lowci = np.insert(tpr_lowci, 0, 0)
+    tpr_uppci = np.insert(tpr_uppci, 0, 0)
+
+    # Concatenate tpr_ci
+    tpr_ci = np.array([tpr_lowci, tpr_uppci])
+
+    if metric is None:
+        return fpr, tpr, tpr_ci
+    else:
+        return fpr, tpr, tpr_ci, stats, bootci_stats
+
+
+def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, val=None, parametric=True):
+    """Calculates required metrics for the roc plot function (fpr, tpr, and tpr_ci).
+
+    Parameters
+    ----------
+    Ytrue : array-like, shape = [n_samples]
+        Binary label for samples (0s and 1s)
+
+    Yscore : array-like, shape = [n_samples]
+        Predicted y score for samples
+
+    Returns
+    ----------------------------------
+    fpr : array-like, shape = [n_samples]
+        False positive rates.
+
+    tpr : array-like, shape = [n_samples]
+        True positive rates.
+
+    tpr_ci : array-like, shape = [n_samples, 2]
+        True positive rates 95% confidence intervals [lowci, uppci].
+    """
+    # model copy
+    model_boot = copy(model)
+
+    # Get fpr, tpr
+    fpr, tpr, threshold = metrics.roc_curve(Ytrue, Yscore, pos_label=1, drop_intermediate=False)
+
+    # fpr, tpr with drop_intermediates for fpr = 0 (useful for plot... since we plot specificity on x-axis, we don't need intermediates when fpr=0)
+    tpr0 = tpr[fpr == 0][-1]
+    tpr = np.concatenate([[tpr0], tpr[fpr > 0]])
+    fpr = np.concatenate([[0], fpr[fpr > 0]])
+
+    # if metric is provided, calculate stats
+    if metric is not None:
+        specificity, sensitivity, threshold = get_spec_sens_cuttoff(Ytrue, Yscore, metric, val)
+        stats = get_stats(Ytrue, Yscore, specificity, parametric)
+        stats["val_specificity"] = specificity
+        stats["val_sensitivity"] = specificity
+        stats["val_cutoffscore"] = threshold
+
+    # bootstrap using vertical averaging
+    tpr_boot = []
+    boot_stats = []
+    for i in tqdm(range(bootnum)):
+        # Resample and get tpr, fpr
+        Ytrue_res, Yscore_res, Xtrue_res = resample(Ytrue, Yscore, Xtrue)
+        Ypred = model_boot.train(Xtrue_res, Ytrue_res)
+        fpr_res, tpr_res, threshold_res = metrics.roc_curve(Ytrue_res, Ypred, pos_label=1, drop_intermediate=False)
 
         # Drop intermediates when fpr=0
         tpr0_res = tpr_res[fpr_res == 0][-1]

@@ -166,6 +166,8 @@ class kfold(BaseCrossVal):
         # Calculate for each parameter and append
         stats_list = []
         std_list = []
+        self.full_loop = []
+        self.cv_loop = []
         for i in range(len(self.param_list)):
             full_loop = []
             cv_loop = []
@@ -190,6 +192,10 @@ class kfold(BaseCrossVal):
             # Combine and append
             stats_combined = {**stats_full_i, **stats_cv_i}
             stats_list.append(stats_combined)
+
+            # Save loop -> full_loop is a placeholder
+            self.full_loop.append(cv_loop)
+            self.cv_loop.append(cv_loop)
 
             # Keep std if n_mc > 1
             if self.n_mc > 1:
@@ -221,5 +227,5 @@ class kfold(BaseCrossVal):
                 ypred_cv_i[idx] = val.tolist()
         return ypred_cv_i
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True):
-        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, model="kfold")
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, color_alpha=color_alpha, color_beta_method=color_beta_method, ci=ci)

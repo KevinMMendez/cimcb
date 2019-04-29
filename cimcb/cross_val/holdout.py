@@ -147,6 +147,8 @@ class holdout(BaseCrossVal):
         # Calculate for each parameter and append
         stats_list = []
         std_list = []
+        self.full_loop = []
+        self.cv_loop = []
         for i in range(len(self.param_list)):
             full_loop = []
             cv_loop = []
@@ -172,6 +174,10 @@ class holdout(BaseCrossVal):
             stats_combined = {**stats_full_i, **stats_cv_i}
             stats_list.append(stats_combined)
 
+            # Save loop -> full_loop is a placeholder
+            self.full_loop.append(full_loop)
+            self.cv_loop.append(cv_loop)
+
             # Keep std if n_mc > 1
             if self.n_mc > 1:
                 std_full_i = dict_perc(full_loop, ci=self.ci)
@@ -188,5 +194,5 @@ class holdout(BaseCrossVal):
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
         return self.table
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True):
-        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, model="holdout")
+    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="holdout", color_beta=color_beta, color_alpha=color_alpha, color_beta_method=color_beta_method, ci=ci)
