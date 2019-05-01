@@ -11,7 +11,7 @@ from scipy import interp
 from sklearn import metrics
 from sklearn.utils import resample
 from ..bootstrap import Perc, BC, BCA
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot
 from ..utils import binary_metrics
 
 
@@ -215,6 +215,19 @@ class BaseModel(ABC):
             tpr_test = np.insert(tpr_test, 0, 0)
             roc_bokeh.line(fpr_test, tpr_test, color="red", line_width=3.5, alpha=0.6, legend="ROC Curve (Test)")  # Add ROC Curve(Test) to roc_bokeh
 
+            # Get Ytrue_test, Yscore_test from testset
+            Ytrue_test = np.array(testset[0])
+            Yscore_test = np.array(testset[1])
+
+            # Get Yscore_combined and Ytrue_combined_name (Labeled Ytrue)
+            Yscore_combined = np.concatenate([Yscore_train, Yscore_test])
+            Ytrue_combined = np.concatenate([Ytrue_train, Ytrue_test + 2])  # Each Ytrue per group is unique
+            Ytrue_combined_name = Ytrue_combined.astype(np.str)
+            Ytrue_combined_name[Ytrue_combined == 0] = "Train (0)"
+            Ytrue_combined_name[Ytrue_combined == 1] = "Train (1)"
+            Ytrue_combined_name[Ytrue_combined == 2] = "Test (0)"
+            Ytrue_combined_name[Ytrue_combined == 3] = "Test (1)"
+
         # Violin plot
         violin_title = "Cut-off: {}".format(np.round(stats["val_cutoffscore"], 2))
         if testset is None:
@@ -310,7 +323,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def evaluate_boot(self, testset=None, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def evaluate_boot(self, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters
@@ -330,30 +343,6 @@ class BaseModel(ABC):
         Ytrue_train = self.Y
         Yscore_train = self.Y_pred.flatten()
 
-        # Get Ytrue_test, Yscore_test from testset
-        if testset is not None:
-            Ytrue_test = np.array(testset[0])
-            Yscore_test = np.array(testset[1])
-
-            # Error checking
-            if len(Ytrue_test) != len(Yscore_test):
-                raise ValueError("evaluate can't be used as length of Ytrue does not match length of Yscore in test set.")
-            if len(np.unique(Ytrue_test)) != 2:
-                raise ValueError("Ytrue_test needs to have 2 groups. There is {}".format(len(np.unique(Y))))
-            if np.sort(np.unique(Ytrue_test))[0] != 0:
-                raise ValueError("Ytrue_test should only contain 0s and 1s.")
-            if np.sort(np.unique(Ytrue_test))[1] != 1:
-                raise ValueError("Ytrue_test should only contain 0s and 1s.")
-
-            # Get Yscore_combined and Ytrue_combined_name (Labeled Ytrue)
-            Yscore_combined = np.concatenate([Yscore_train, Yscore_test])
-            Ytrue_combined = np.concatenate([Ytrue_train, Ytrue_test + 2])  # Each Ytrue per group is unique
-            Ytrue_combined_name = Ytrue_combined.astype(np.str)
-            Ytrue_combined_name[Ytrue_combined == 0] = "Train (0)"
-            Ytrue_combined_name[Ytrue_combined == 1] = "Train (1)"
-            Ytrue_combined_name[Ytrue_combined == 2] = "Test (0)"
-            Ytrue_combined_name[Ytrue_combined == 3] = "Test (1)"
-
         # Expliclity states which metric and value is used for the error_bar
         if specificity is not False:
             metric = "specificity"
@@ -366,90 +355,70 @@ class BaseModel(ABC):
             val = 0.8
 
         # ROC plot
-        tpr, fpr, tpr_ci, stats, stats_bootci = roc_calculate_boot(self, self.X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
-        # roc_title = "Specificity: {}".format(np.round(stats["val_specificity"], 2))
-        roc_title = "AUC: {} ({}, {})".format(np.round(stats["AUC"], 2), np.round(stats_bootci["AUC"][0], 2), np.round(stats_bootci["AUC"][1], 2))
-        roc_bokeh = roc_plot(tpr, fpr, tpr_ci, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"])
-        if testset is not None:
-            fpr_test, tpr_test, threshold_test = metrics.roc_curve(Ytrue_test, Yscore_test, pos_label=1, drop_intermediate=False)
-            fpr_test = np.insert(fpr_test, 0, 0)
-            tpr_test = np.insert(tpr_test, 0, 0)
-            roc_bokeh.line(fpr_test, tpr_test, color="red", line_width=3.5, alpha=0.6, legend="ROC Curve (Test)")  # Add ROC Curve(Test) to roc_bokeh
+        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats = roc_calculate_boot(self, self.X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
+        roc_title = "AUC: {} ({})".format(np.round(stat_ib["AUC"][0], 2), np.round(stat_oob["AUC"][0], 2))
+        roc_bokeh = roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"], label_font_size="10pt")
+
+        # Get Yscore_combined and Ytrue_combined_name (Labeled Ytrue)
+        Yscore_train = np.array(median_ib).flatten()
+        Ytrue_train = np.array([0, 1] * len(median_ib))
+        Yscore_test = np.array(median_oob).flatten()
+        Ytrue_test = np.array([0, 1] * len(median_oob))
+        Yscore_combined = np.concatenate([Yscore_train, Yscore_test])
+        Ytrue_combined = np.concatenate([Ytrue_train, Ytrue_test + 2])  # Each Ytrue per group is unique
+        Ytrue_combined_name = Ytrue_combined.astype(np.str)
+        Ytrue_combined_name[Ytrue_combined == 0] = "IB (0)"
+        Ytrue_combined_name[Ytrue_combined == 1] = "IB (1)"
+        Ytrue_combined_name[Ytrue_combined == 2] = "OOB (0)"
+        Ytrue_combined_name[Ytrue_combined == 3] = "OOB (1)"
 
         # Violin plot
         violin_title = "Cut-off: {}".format(np.round(stats["val_cutoffscore"], 2))
-        if testset is None:
-            violin_bokeh = boxplot(Yscore_train, Ytrue_train, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315, title=violin_title, font_size="11pt")
-        else:
-            violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["Train (0)", "Test (0)", "Train (1)", "Test (1)"], group_name_sort=["Test (0)", "Test (1)", "Train (0)", "Train (1)"], title=violin_title, font_size="11pt")
+        violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Median Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["IB (0)", "OOB (0)", "IB (1)", "OOB (1)"], group_name_sort=["IB (0)", "IB (1)", "OOB (0)", "OOB (1)"], title=violin_title, font_size="11pt", label_font_size="10pt")
         violin_bokeh.multi_line([[-100, 100]], [[stats["val_cutoffscore"], stats["val_cutoffscore"]]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
         # Distribution plot
-        if testset is None:
-            dist_bokeh = distribution(Yscore_train, group=Ytrue_train, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
-        else:
-            dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt")
         dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
-        # Man-Whitney U for Table (round and use scienitic notation if p-value > 0.001)
-        manw_pval = scipy.stats.mannwhitneyu(Yscore_train[Ytrue_train == 0], Yscore_train[Ytrue_train == 1], alternative="two-sided")[1]
-        if manw_pval > 0.001:
-            manw_pval_round = "%0.2f" % manw_pval
-        else:
-            manw_pval_round = "%0.2e" % manw_pval
-        if testset is not None:
-            testmanw_pval = scipy.stats.mannwhitneyu(Yscore_test[Ytrue_test == 0], Yscore_test[Ytrue_test == 1], alternative="two-sided")[1]
-            if testmanw_pval > 0.001:
-                testmanw_pval_round = "%0.2f" % testmanw_pval
-            else:
-                testmanw_pval_round = "%0.2e" % testmanw_pval
-
-        # Create a stats table for test
-        if testset is not None:
-            teststats = binary_metrics(Ytrue_test, Yscore_test, cut_off=stats["val_cutoffscore"], parametric=self.parametric)
-            teststats_round = {}
-            for i in teststats.keys():
-                teststats_round[i] = str(np.round(teststats[i], 2))
+        # Round stats, and stats_bootci for Table
+        stats_round_ib = {}
+        for i in stat_ib.keys():
+            stats_round_ib[i] = np.round(stat_ib[i], 2)
 
         # Round stats, and stats_bootci for Table
-        stats_round = {}
-        for i in stats.keys():
-            stats_round[i] = np.round(stats[i], 2)
-        bootci_round = {}
-        for i in stats_bootci.keys():
-            bootci_round[i] = np.round(stats_bootci[i], 2)
+        stats_round_oob = {}
+        for i in stat_oob.keys():
+            stats_round_oob[i] = np.round(stat_oob[i], 2)
 
         # Create table
         tabledata = dict(
-            evaluate=[["Train"]],
-            manw_pval=[["{}".format(manw_pval_round)]],
-            auc=[["{} ({}, {})".format(stats_round["AUC"], bootci_round["AUC"][0], bootci_round["AUC"][1])]],
-            accuracy=[["{} ({}, {})".format(stats_round["ACCURACY"], bootci_round["ACCURACY"][0], bootci_round["ACCURACY"][1])]],
-            precision=[["{} ({}, {})".format(stats_round["PRECISION"], bootci_round["PRECISION"][0], bootci_round["PRECISION"][1])]],
-            sensitivity=[["{} ({}, {})".format(stats_round["SENSITIVITY"], bootci_round["SENSITIVITY"][0], bootci_round["SENSITIVITY"][1])]],
-            specificity=[["{}".format(stats_round["SPECIFICITY"])]],
-            F1score=[["{} ({}, {})".format(stats_round["F1-SCORE"], bootci_round["F1-SCORE"][0], bootci_round["F1-SCORE"][1])]],
-            R2=[["{} ({}, {})".format(stats_round["R²"], bootci_round["R²"][0], bootci_round["R²"][1])]],
+            evaluate=[["In Bag"]],
+            auc=[["{} ({}, {})".format(stats_round_ib["AUC"][0], stats_round_ib["AUC"][1], stats_round_ib["AUC"][2])]],
+            accuracy=[["{} ({}, {})".format(stats_round_ib["ACCURACY"][0], stats_round_ib["ACCURACY"][1], stats_round_ib["ACCURACY"][2])]],
+            precision=[["{} ({}, {})".format(stats_round_ib["PRECISION"][0], stats_round_ib["PRECISION"][1], stats_round_ib["PRECISION"][2])]],
+            sensitivity=[["{} ({}, {})".format(stats_round_ib["SENSITIVITY"][0], stats_round_ib["SENSITIVITY"][1], stats_round_ib["SENSITIVITY"][2])]],
+            specificity=[["{}".format(stats_round_ib["SPECIFICITY"][0])]],
+            F1score=[["{} ({}, {})".format(stats_round_ib["F1-SCORE"][0], stats_round_ib["F1-SCORE"][1], stats_round_ib["F1-SCORE"][2])]],
+            R2=[["{} ({}, {})".format(stats_round_ib["R²"][0], stats_round_ib["R²"][1], stats_round_ib["R²"][2])]],
         )
 
         # Append test data
-        if testset is not None:
-            tabledata["evaluate"].append(["Test"])
-            tabledata["manw_pval"].append([testmanw_pval_round])
-            tabledata["auc"].append([teststats_round["AUC"]])
-            tabledata["accuracy"].append([teststats_round["ACCURACY"]])
-            tabledata["precision"].append([teststats_round["PRECISION"]])
-            tabledata["sensitivity"].append([teststats_round["SENSITIVITY"]])
-            tabledata["specificity"].append([teststats_round["SPECIFICITY"]])
-            tabledata["F1score"].append([teststats_round["F1-SCORE"]])
-            tabledata["R2"].append([teststats_round["R²"]])
+        tabledata["evaluate"].append(["Out of Bag"])
+        tabledata["auc"].append(["{} ({}, {})".format(stats_round_oob["AUC"][0], stats_round_oob["AUC"][1], stats_round_oob["AUC"][2])])
+        tabledata["accuracy"].append(["{} ({}, {})".format(stats_round_oob["ACCURACY"][0], stats_round_oob["ACCURACY"][1], stats_round_oob["ACCURACY"][2])])
+        tabledata["precision"].append(["{} ({}, {})".format(stats_round_oob["PRECISION"][0], stats_round_oob["PRECISION"][1], stats_round_oob["PRECISION"][2])])
+        tabledata["sensitivity"].append(["{} ({}, {})".format(stats_round_oob["SENSITIVITY"][0], stats_round_oob["SENSITIVITY"][1], stats_round_oob["SENSITIVITY"][2])])
+        tabledata["specificity"].append(["{}".format(stats_round_oob["SPECIFICITY"][0])])
+        tabledata["F1score"].append(["{} ({}, {})".format(stats_round_oob["F1-SCORE"][0], stats_round_oob["F1-SCORE"][1], stats_round_oob["F1-SCORE"][2])])
+        tabledata["R2"].append(["{} ({}, {})".format(stats_round_oob["R²"][0], stats_round_oob["R²"][1], stats_round_oob["R²"][2])])
 
         # Save Table
         self.table = tabledata
 
         # Plot table
         source = ColumnDataSource(data=tabledata)
-        columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="MW-U Pvalue"), TableColumn(field="R2", title="R2"), TableColumn(field="accuracy", title="Accuracy"), TableColumn(field="precision", title="Precision"), TableColumn(field="F1score", title="F1score"), TableColumn(field="sensitivity", title="Sensitivity"), TableColumn(field="specificity", title="Specificity")]
+        columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC"), TableColumn(field="accuracy", title="Accuracy"), TableColumn(field="precision", title="Precision"), TableColumn(field="F1score", title="F1score"), TableColumn(field="sensitivity", title="Sensitivity"), TableColumn(field="specificity", title="Specificity")]
         table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
 
         # Title

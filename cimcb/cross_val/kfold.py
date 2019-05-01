@@ -42,7 +42,7 @@ class kfold(BaseCrossVal):
 
     def __init__(self, model, X, Y, param_dict, folds=5, n_mc=1, n_boot=0, n_cores=-1, ci=95):
         super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores, ci=ci)
-        self.crossval_idx = StratifiedKFold(n_splits=folds)
+        self.crossval_idx = StratifiedKFold(n_splits=folds, shuffle=True)
 
     def calc_ypred(self):
         """Calculates ypred full and ypred cv."""
@@ -227,5 +227,5 @@ class kfold(BaseCrossVal):
                 ypred_cv_i[idx] = val.tolist()
         return ypred_cv_i
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
-        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, color_alpha=color_alpha, color_beta_method=color_beta_method, ci=ci)
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=1, ci=95):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, ci=ci)

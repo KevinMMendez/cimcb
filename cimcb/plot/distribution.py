@@ -3,7 +3,7 @@ from scipy import stats
 from bokeh.plotting import figure
 
 
-def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="Pr(x)", font_size="20pt", label_font_size="13pt", width=500, height=400, color_hist="green", color_kde="mediumturquoise"):
+def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="Pr(x)", font_size="20pt", label_font_size="13pt", width=500, height=400, color_hist="green", color_kde="mediumturquoise", padding=0.5):
     """Creates a distribution plot using Bokeh.
 
     Required Parameters
@@ -25,7 +25,7 @@ def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="P
 
     # Density curve
     x1_min, x1_max = x1.min(), x1.max()
-    x1_padding = (x1_max - x1_min) * 0.5
+    x1_padding = (x1_max - x1_min) * padding
     x1_grid = np.linspace(x1_min - x1_padding, x1_max + x1_padding, 500)
     x1_pdf = stats.gaussian_kde(x1, "scott")
     x1_pdf_grid = x1_pdf(x1_grid)
@@ -36,7 +36,7 @@ def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="P
 
     # Density curve
     x2_min, x2_max = x2.min(), x2.max()
-    x2_padding = (x2_max - x2_min) * 0.5
+    x2_padding = (x2_max - x2_min) * padding
     x2_grid = np.linspace(x2_min - x2_padding, x2_max + x2_padding, 500)
     x2_pdf = stats.gaussian_kde(x2, "scott")
     x2_pdf_grid = x2_pdf(x2_grid)
@@ -49,7 +49,7 @@ def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="P
     if len(group_unique) == 4:
         # Density curve
         x3_min, x3_max = x3.min(), x3.max()
-        x3_padding = (x3_max - x3_min) * 0.5
+        x3_padding = (x3_max - x3_min) * padding
         x3_grid = np.linspace(x3_min - x3_padding, x3_max + x3_padding, 500)
         x3_pdf = stats.gaussian_kde(x3, "scott")
         x3_pdf_grid = x3_pdf(x3_grid)
@@ -60,7 +60,7 @@ def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="P
 
         # Density curve
         x4_min, x4_max = x4.min(), x4.max()
-        x4_padding = (x4_max - x4_min) * 0.5
+        x4_padding = (x4_max - x4_min) * padding
         x4_grid = np.linspace(x4_min - x4_padding, x4_max + x4_padding, 500)
         x4_pdf = stats.gaussian_kde(x4, "scott")
         x4_pdf_grid = x4_pdf(x4_grid)

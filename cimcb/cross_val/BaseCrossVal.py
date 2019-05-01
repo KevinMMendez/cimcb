@@ -5,9 +5,10 @@ import math
 import multiprocessing
 from abc import ABC, abstractmethod
 from bokeh.layouts import gridplot
+from pscript import py2js
 from bokeh import events
 from bokeh.plotting import figure, output_notebook, show
-from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine, Patch, Patches, CustomJS, Text
+from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine, Patch, Patches, CustomJS, Text, Title
 from itertools import product
 from sklearn.model_selection import ParameterGrid
 from sklearn import preprocessing
@@ -101,7 +102,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=1, ci=95):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -119,7 +120,7 @@ class BaseCrossVal(ABC):
         if len(self.param_dict2) == 1:
             fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, color_alpha=color_alpha, color_beta_method=color_beta_method, ci=ci)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
@@ -343,7 +344,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="linear", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=1, ci=95):
 
         # Get ci
         if self.n_mc > 1:
@@ -449,9 +450,9 @@ class BaseCrossVal(ABC):
         param_dict = self.param_dict2
         param_list = self.param_list2
 
-        full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta, alpha=color_alpha, beta_method=color_beta_method)
-        cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta, alpha=color_alpha, beta_method=color_beta_method)
-        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta, alpha=color_alpha, beta_method=color_beta_method)
+        full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta)
+        cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta)
+        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta)
 
         # Text for heatmaps
         full_text = []
@@ -765,13 +766,13 @@ class BaseCrossVal(ABC):
 
         if self.n_mc > 1:
             p5_render_patch2 = p5.patches("monte_line_key0_value", "monte_line1_cv", alpha=0, color="blue", source=source)
-            p5_render_patch2.selection_glyph = Patches(fill_alpha=0.1, fill_color="blue", line_color="white")
+            p5_render_patch2.selection_glyph = Patches(fill_alpha=0.2, fill_color="blue", line_color="white")
             p5_render_patch2.nonselection_glyph.fill_alpha = 0
             p5_render_patch2.nonselection_glyph.line_color = "white"
             # kfold monte-carlo does not have ci for R2
             if model is not "kfold":
                 p5_render_patch1 = p5.patches("monte_line_key0_value", "monte_line1_full", alpha=0, color="red", source=source)
-                p5_render_patch1.selection_glyph = Patches(fill_alpha=0.1, fill_color="red", line_color="white")
+                p5_render_patch1.selection_glyph = Patches(fill_alpha=0.2, fill_color="red", line_color="white")
                 p5_render_patch1.nonselection_glyph.fill_alpha = 0
                 p5_render_patch1.nonselection_glyph.line_color = "white"
 

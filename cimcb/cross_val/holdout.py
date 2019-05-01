@@ -194,5 +194,5 @@ class holdout(BaseCrossVal):
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
         return self.table
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="linear", rotate_xlabel=True, legend="bottom_right", color_beta=None, color_alpha=1, color_beta_method=1, ci=95):
-        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="holdout", color_beta=color_beta, color_alpha=color_alpha, color_beta_method=color_beta_method, ci=ci)
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=1, ci=95):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="holdout", color_beta=color_beta, ci=ci)

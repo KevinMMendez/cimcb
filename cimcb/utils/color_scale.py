@@ -2,50 +2,26 @@ import numpy as np
 from sklearn import preprocessing
 
 
-def color_scale(x, method="linear", beta=None, alpha=1, beta_method=1):
+def color_scale(x, method="linear", beta=None):
 
-    # Set-up for non-linear scaling for heatmap color
-    if method is "log":
-        scale_x = np.log(x)
-    elif method is "square":
-        scale_x = x ** 2
-    elif method is "square root":
-        scale_x = np.sqrt(x)
-    elif method is "log+1":
-        scale_x = np.log(x + 1)
-    else:
-        scale_x = x
-
-    # Basic Min_Max for heatmap (changing alpha (opaque) rather than colour)... linear from 0 to 1
-    # Clean all this up!!!
+    # Initially scale between 0 and 1
     scaler = preprocessing.MinMaxScaler(feature_range=(0.1, 1))
-    scale_x_final = scaler.fit_transform(scale_x[:, np.newaxis])
-    if beta is not None:
-        if beta_method == 1:
-            scale_i = []
-            for i in scale_x_final[:, 0]:
-                stat = 1 / beta * np.tanh(beta * (alpha + i))
-                scale_i.append(stat)
-            scale_x = scale_i
-        elif beta_method == 2:
-            scale_i = []
-            for i in scale_x_final[:, 0]:
-                stat = 1 / beta * np.arctan(beta * (alpha + i))
-                scale_i.append(stat)
-            scale_x = scale_i
-        elif beta_method == 3:
-            scale_i = []
-            for i in scale_x_final[:, 0]:
-                stat = 1 + np.tanh(beta * (alpha + i))
-                scale_i.append(stat)
-            scale_x = scale_i
-        else:
-            scale_i = []
-            for i in scale_x_final[:, 0]:
-                stat = np.tanh(beta * (alpha + i))
-                scale_i.append(stat)
-            scale_x = scale_i
-        scale_x = np.array(scale_x)
-        scale_x_final = scaler.fit_transform(scale_x[:, np.newaxis])
+    x_init = scaler.fit_transform(x[:, np.newaxis]).flatten()
 
-    return scale_x_final
+    # Methods of transformation
+    if method == "linear":
+        x_tr = x_init
+    elif method == "sq":
+        x_tr = x_init ** 2
+    elif method == "sqrt":
+        x_tr = np.sqrt(x_init)
+    elif method == "tanh+1":
+        x_tr = 1 + np.tanh(beta * (-1 + x_init))
+    elif method == "tanh":
+        x_tr_init = np.tanh(beta * (-1 + x_init))
+        x_tr = scaler.fit_transform(x_tr_init[:, np.newaxis]).flatten()
+    else:
+        print("An incorrect method for color_scale was selected, so it set to 'linear'. Supported methods are 'linear', 'sq', 'sqrt', 'tanh', and 'tanh+1'.")
+        x_tr = x_init
+
+    return x_tr
