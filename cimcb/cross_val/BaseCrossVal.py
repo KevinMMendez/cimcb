@@ -344,7 +344,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=1, ci=95):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend=None, color_beta=1, ci=95):
 
         # Get ci
         if self.n_mc > 1:
