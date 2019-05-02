@@ -227,5 +227,5 @@ class kfold(BaseCrossVal):
                 ypred_cv_i[idx] = val.tolist()
         return ypred_cv_i
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=1, ci=95):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend=None, color_beta=1, ci=95):
         super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, ci=ci)
