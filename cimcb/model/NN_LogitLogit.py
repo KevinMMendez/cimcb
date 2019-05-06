@@ -13,11 +13,11 @@ class NN_LogitLogit(BaseModel):
     parametric = False
     bootlist = None
 
-    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
-        self.n_nodes = n_nodes
+    def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
+        self.n_neurons = n_neurons
         self.verbose = verbose
         self.n_epochs = epochs
-        self.k = n_nodes
+        self.k = n_neurons
         self.batch_size = batch_size
         self.loss = loss
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
@@ -47,7 +47,7 @@ class NN_LogitLogit(BaseModel):
             self.batch_size = len(X)
 
         self.model = Sequential()
-        self.model.add(Dense(self.n_nodes, activation="sigmoid", input_dim=len(X.T)))
+        self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
         self.model.add(Dense(1, activation="sigmoid"))
         self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
 

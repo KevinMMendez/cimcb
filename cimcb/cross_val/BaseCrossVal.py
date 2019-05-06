@@ -4,7 +4,7 @@ import re
 import math
 import multiprocessing
 from abc import ABC, abstractmethod
-from bokeh.layouts import gridplot
+from bokeh.layouts import gridplot, layout
 from pscript import py2js
 from bokeh import events
 from bokeh.plotting import figure, output_notebook, show
@@ -344,7 +344,10 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend=None, color_beta=1, ci=95):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=1, ci=95):
+
+        # legend always None
+        legend = None
 
         # Get ci
         if self.n_mc > 1:
@@ -450,9 +453,14 @@ class BaseCrossVal(ABC):
         param_dict = self.param_dict2
         param_list = self.param_list2
 
+        # diff_alpha_input = diff_score.copy()
+        # for i in diff_alpha_input.index:
+        #     diff_alpha_input[i] = -diff_alpha_input[i]
+
         full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta)
         cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta)
-        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta)
+        diff_alpha = color_scale(diff_score, method="linear", beta=color_beta - 2)
+        # diff_alpha = 1.1 - diff_alpha
 
         # Text for heatmaps
         full_text = []
@@ -574,8 +582,8 @@ class BaseCrossVal(ABC):
         for i in line0_full:
             line0_full_text.append(i[-1])
 
-        ptext_is = ["Learning Rate", "Nodes", "Momentum", "Decay", "Components", "Batch Size", "Gamma", "C", "Estimators", "Max Features", "Max Depth", "Min Samples Split", "Min Samples Leaf", "Max Leaf Nodes"]
-        ptext_change = ["LR", "Node", "Mom", "Dec", "Comp", "Bat", "Gam", "C", "Est", "Feat", "Dep", "SSpl", "SLea", "LNod"]
+        ptext_is = ["Learning Rate", "Nodes", "Neurons", "Momentum", "Decay", "Components", "Batch Size", "Gamma", "C", "Estimators", "Max Features", "Max Depth", "Min Samples Split", "Min Samples Leaf", "Max Leaf Nodes"]
+        ptext_change = ["LR", "Node", "Neur", "Mom", "Dec", "Comp", "Bat", "Gam", "C", "Est", "Feat", "Dep", "SSpl", "SLea", "LNod"]
 
         ptext = []
         for i in param_keys_axis:
@@ -760,10 +768,16 @@ class BaseCrossVal(ABC):
                 if i % 3 == 0:
                     l1_range_special.append([l1_range_special[-1][0] + " "])
         l1_xrange = pd.unique(key0_unique)
-        l1_xrange = np.append(l1_xrange, l1_range_special)
+        l1_xrange2 = np.append(l1_xrange, l1_range_special)
         l1_title = y_axis_text + " over " + param_keys_title[0]
-        p5 = figure(title=l1_title, x_axis_label=param_keys_axis[0], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l1_xrange, tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
 
+        y_range_min = min(cv_score) - min(cv_score) * 0.1
+        y_range_max = max(full_score) + max(full_score) * 0.05
+
+        p5 = figure(title=l1_title, x_axis_label=param_keys_axis[0], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l1_xrange2, tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
+        p5.quad(top=[1000], bottom=[-1000], left=[l1_xrange[-1]], right=[1000], color="white")
+
+        # p5.outline_line_color = "white"
         if self.n_mc > 1:
             p5_render_patch2 = p5.patches("monte_line_key0_value", "monte_line1_cv", alpha=0, color="blue", source=source)
             p5_render_patch2.selection_glyph = Patches(fill_alpha=0.2, fill_color="blue", line_color="white")
@@ -830,10 +844,13 @@ class BaseCrossVal(ABC):
                 if i % 3 == 0:
                     l2_range_special.append([l2_range_special[-1][0] + " "])
         l2_xrange = pd.unique(key1_unique)
-        l2_xrange = np.append(l2_xrange, l2_range_special)
+        l2_xrange2 = np.append(l2_xrange, l2_range_special)
         l1_title = y_axis_text + " over " + param_keys_title[0]
         l2_title = y_axis_text + " over " + param_keys_title[1]
-        p6 = figure(title=l2_title, x_axis_label=param_keys_axis[1], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l2_xrange, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
+        y_range_min = min(cv_score) - min(cv_score) * 0.1
+        y_range_max = max(full_score) + max(full_score) * 0.05
+        p6 = figure(title=l2_title, x_axis_label=param_keys_axis[1], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l2_xrange2, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
+        p6.quad(top=[1000], bottom=[-1000], left=[l2_xrange[-1]], right=[1000], color="white")
 
         if self.n_mc > 1:
             p6_render_patch2 = p6.patches("monte_line_key1_value", "monte_line0_cv", alpha=0, color="blue", source=source)

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from bokeh.models import Band, HoverTool
 from tqdm import tqdm
 from copy import deepcopy, copy
@@ -7,10 +8,10 @@ from scipy import interp
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.utils import resample
-from ..utils import binary_metrics
+from ..utils import binary_metrics, dict_median
 
 
-def roc_plot(fpr, tpr, tpr_ci, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", title="", errorbar=False):
+def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", title="", errorbar=False):
     """Creates a rocplot using Bokeh.
 
     Parameters
@@ -28,7 +29,11 @@ def roc_plot(fpr, tpr, tpr_ci, width=450, height=350, xlabel="1-Specificity", yl
     # Get CI
     tpr_lowci = tpr_ci[0]
     tpr_uppci = tpr_ci[1]
+    tpr_medci = tpr_ci[2]
     auc = metrics.auc(fpr, tpr)
+
+    if median == True:
+        tpr = tpr_medci
 
     # specificity and ci-interval for HoverTool
     spec = 1 - fpr
@@ -170,15 +175,17 @@ def roc_calculate(Ytrue, Yscore, bootnum=1000, metric=None, val=None, parametric
     # Get CI for tpr
     tpr_lowci = np.percentile(tpr_boot, 2.5, axis=0)
     tpr_uppci = np.percentile(tpr_boot, 97.5, axis=0)
+    tpr_medci = np.percentile(tpr_boot, 50, axis=0)
 
     # Add the starting 0
     tpr = np.insert(tpr, 0, 0)
     fpr = np.insert(fpr, 0, 0)
     tpr_lowci = np.insert(tpr_lowci, 0, 0)
     tpr_uppci = np.insert(tpr_uppci, 0, 0)
+    tpr_medci = np.insert(tpr_medci, 0, 0)
 
     # Concatenate tpr_ci
-    tpr_ci = np.array([tpr_lowci, tpr_uppci])
+    tpr_ci = np.array([tpr_lowci, tpr_uppci, tpr_medci])
 
     if metric is None:
         return fpr, tpr, tpr_ci
@@ -323,6 +330,12 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
 
     # bootstrap using vertical averaging to linspace
     mean_fpr = np.linspace(0, 1, 1000)
+    # understand location
+    x_loc = pd.DataFrame(Xtrue)
+    x0_loc = list(x_loc[Ytrue == 0].index)
+    x1_loc = list(x_loc[Ytrue == 1].index)
+    x_loc_ib_dict =  {k: [] for k in list(x_loc.index)}
+    x_loc_oob_dict =  {k: [] for k in list(x_loc.index)}
     # stratified resample
     x0 = Xtrue[Ytrue == 0]
     x1 = Xtrue[Ytrue == 1]
@@ -363,6 +376,15 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
         ypred_ib_0 = ypred_ib[: len(x0_idx_ib)]
         ypred_ib_1 = ypred_ib[len(x0_idx_ib) :]
         median_ib.append([np.median(ypred_ib_0), np.median(ypred_ib_1)])
+        # get average ypred
+        for i in range(len(ypred_ib_0)):
+            idx_res = x0_idx_ib[i]
+            idx_true = x0_loc[idx_res]
+            x_loc_ib_dict[idx_true].append(ypred_ib_0[i])
+        for i in range(len(ypred_ib_1)):
+            idx_res = x1_idx_ib[i]
+            idx_true = x1_loc[idx_res]
+            x_loc_ib_dict[idx_true].append(ypred_ib_1[i])
         # get ib fpr, tpr, stats
         fpri, tpri, _ = metrics.roc_curve(y_ib, ypred_ib, pos_label=1, drop_intermediate=False)
         fpr_ib.append(mean_fpr)
@@ -376,6 +398,15 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
         ypred_oob_0 = ypred_oob[: len(x0_idx_oob)]
         ypred_oob_1 = ypred_oob[len(x0_idx_oob) :]
         median_oob.append([np.median(ypred_oob_0), np.median(ypred_oob_1)])
+        # get average ypred
+        for i in range(len(ypred_oob_0)):
+            idx_res = x0_idx_oob[i]
+            idx_true = x0_loc[idx_res]
+            x_loc_oob_dict[idx_true].append(ypred_oob_0[i])
+        for i in range(len(ypred_oob_1)):
+            idx_res = x1_idx_oob[i]
+            idx_true = x1_loc[idx_res]
+            x_loc_oob_dict[idx_true].append(ypred_oob_1[i])
         # get oob
         fpro, tpro, _ = metrics.roc_curve(y_oob, ypred_oob, pos_label=1, drop_intermediate=False)
         fpr_oob.append(mean_fpr)
@@ -443,13 +474,17 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     tpr_ib_medci = np.insert(tpr_ib_medci, 0, 0)
     tpr_ib_uppci = np.insert(tpr_ib_uppci, 0, 0)
 
+    # Get median score per boot
+    median_y_ib = x_loc_ib_dict
+    median_y_oob = x_loc_oob_dict
+
     # Concatenate tpr_ci
     tpr_ib_ci = np.array([tpr_ib_medci, tpr_ib_lowci, tpr_ib_uppci])
 
     if metric is None:
         return fpr, tpr, tpr_ci
     else:
-        return fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats
+        return fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob
 
 
 def get_sens_spec(Ytrue, Yscore, cuttoff_val):

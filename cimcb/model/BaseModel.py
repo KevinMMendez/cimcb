@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 import numpy as np
 import pandas as pd
 import scipy
+from copy import deepcopy, copy
 from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.models import HoverTool, Band
 from bokeh.models.widgets import DataTable, Div, TableColumn
@@ -149,7 +150,7 @@ class BaseModel(ABC):
         output_notebook()
         show(fig)
 
-    def evaluate(self, testset=None, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def evaluate(self, testset=None, plot_median=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
         Parameters
@@ -208,7 +209,7 @@ class BaseModel(ABC):
         tpr, fpr, tpr_ci, stats, stats_bootci = roc_calculate(Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
         # roc_title = "Specificity: {}".format(np.round(stats["val_specificity"], 2))
         roc_title = "AUC: {} ({}, {})".format(np.round(stats["AUC"], 2), np.round(stats_bootci["AUC"][0], 2), np.round(stats_bootci["AUC"][1], 2))
-        roc_bokeh = roc_plot(tpr, fpr, tpr_ci, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"])
+        roc_bokeh = roc_plot(tpr, fpr, tpr_ci, median=plot_median, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"])
         if testset is not None:
             fpr_test, tpr_test, threshold_test = metrics.roc_curve(Ytrue_test, Yscore_test, pos_label=1, drop_intermediate=False)
             fpr_test = np.insert(fpr_test, 0, 0)
@@ -223,6 +224,8 @@ class BaseModel(ABC):
             Yscore_combined = np.concatenate([Yscore_train, Yscore_test])
             Ytrue_combined = np.concatenate([Ytrue_train, Ytrue_test + 2])  # Each Ytrue per group is unique
             Ytrue_combined_name = Ytrue_combined.astype(np.str)
+            self.Yscore_combined = Yscore_combined
+            self.Ytrue_combined = Ytrue_combined
             Ytrue_combined_name[Ytrue_combined == 0] = "Train (0)"
             Ytrue_combined_name[Ytrue_combined == 1] = "Train (1)"
             Ytrue_combined_name[Ytrue_combined == 2] = "Test (0)"
@@ -298,6 +301,7 @@ class BaseModel(ABC):
 
         # Save Table
         self.table = tabledata
+        self.table_eval = tabledata
 
         # Plot table
         source = ColumnDataSource(data=tabledata)
@@ -323,7 +327,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def evaluate_boot(self, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def booteval(self, X, Y, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters
@@ -340,8 +344,10 @@ class BaseModel(ABC):
             bootnum : a positive integer, (default 1000)
                 The number of bootstrap samples used in the computation.
             """
-        Ytrue_train = self.Y
-        Yscore_train = self.Y_pred.flatten()
+        model_boot = copy(self)
+        X, Y = self.input_check(X, Y)
+        Ytrue_train = Y
+        Yscore_train = model_boot.train(X, Y).flatten()
 
         # Expliclity states which metric and value is used for the error_bar
         if specificity is not False:
@@ -355,17 +361,45 @@ class BaseModel(ABC):
             val = 0.8
 
         # ROC plot
-        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats = roc_calculate_boot(self, self.X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
+        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
         roc_title = "AUC: {} ({})".format(np.round(stat_ib["AUC"][0], 2), np.round(stat_oob["AUC"][0], 2))
         roc_bokeh = roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"], label_font_size="10pt")
 
-        # Get Yscore_combined and Ytrue_combined_name (Labeled Ytrue)
-        Yscore_train = np.array(median_ib).flatten()
-        Ytrue_train = np.array([0, 1] * len(median_ib))
-        Yscore_test = np.array(median_oob).flatten()
-        Ytrue_test = np.array([0, 1] * len(median_oob))
-        Yscore_combined = np.concatenate([Yscore_train, Yscore_test])
-        Ytrue_combined = np.concatenate([Ytrue_train, Ytrue_test + 2])  # Each Ytrue per group is unique
+        # train is ib, test is oob
+        Yscore_train_dict = {}
+        for key, value in median_y_ib.items():
+            if len(value) == 0:
+                vals = np.nan
+            else:
+                vals = np.mean(value)
+            Yscore_train_dict[key] = vals
+        Yscore_test_dict = {}
+        for key, value in median_y_oob.items():
+            if len(value) == 0:
+                vals = np.nan
+            else:
+                vals = np.mean(value)
+            Yscore_test_dict[key] = vals
+        Yscore_train = np.zeros(len(Y))
+        for key, values in Yscore_train_dict.items():
+            Yscore_train[key] = values
+        Yscore_test = np.zeros(len(Y))
+        for key, values in Yscore_test_dict.items():
+            Yscore_test[key] = values
+        Ytrue_train = Y
+        Ytrue_test = Y
+        Yscore_combined_nan = np.concatenate([Yscore_train, Yscore_test])
+        Ytrue_combined_nan = np.concatenate([Ytrue_train, Ytrue_test + 2])  # Each Ytrue per group is unique
+        Yscore_combined = []
+        Ytrue_combined = []
+        for i in range(len(Yscore_combined_nan)):
+            if np.isnan(Yscore_combined_nan[i]) == False:
+                Yscore_combined.append(Yscore_combined_nan[i])
+                Ytrue_combined.append(Ytrue_combined_nan[i])
+        Yscore_combined = np.array(Yscore_combined)
+        Ytrue_combined = np.array(Ytrue_combined)
+        self.Yscore_combined = Yscore_combined
+        self.Ytrue_combined = Ytrue_combined
         Ytrue_combined_name = Ytrue_combined.astype(np.str)
         Ytrue_combined_name[Ytrue_combined == 0] = "IB (0)"
         Ytrue_combined_name[Ytrue_combined == 1] = "IB (1)"
@@ -414,7 +448,7 @@ class BaseModel(ABC):
         tabledata["R2"].append(["{} ({}, {})".format(stats_round_oob["R²"][0], stats_round_oob["R²"][1], stats_round_oob["R²"][2])])
 
         # Save Table
-        self.table = tabledata
+        self.table_booteval = tabledata
 
         # Plot table
         source = ColumnDataSource(data=tabledata)

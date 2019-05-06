@@ -20,10 +20,10 @@ def knnimpute(x, k=3):
     z: array-like
         An array-like object corresponding to x with NaNs imputed.
     """
-    
+
     # Tranpose x so we treat columns as features, and rows as samples
     x = x.T
-    
+
     # Error check for k value
     if type(k) is not int:
         raise ValueError("k is not an integer")
@@ -38,7 +38,7 @@ def knnimpute(x, k=3):
 
     # Use columns without NaNs for knnimpute
     nan_check = np.isnan(x)
-    no_nan = np.where(sum(nan_check.T) == 0, 1, 0) 
+    no_nan = np.where(sum(nan_check.T) == 0, 1, 0)
 
     # Error check that not all columns have NaNs
     x_no_nan = x[no_nan == 1]
@@ -94,7 +94,7 @@ def knnimpute(x, k=3):
             if imp_val is not np.nan:
                 z[nan_rows[i], nan_cols[i]] = imp_val
                 break
-                
-    # Transpose z 
+
+    # Transpose z
     z = z.T
     return z

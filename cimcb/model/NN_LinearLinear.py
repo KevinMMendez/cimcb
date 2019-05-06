@@ -13,11 +13,11 @@ class NN_LinearLinear(BaseModel):
     parametric = False
     bootlist = None
 
-    def __init__(self, n_nodes=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="mean_squared_error", batch_size=None, verbose=0):
-        self.n_nodes = n_nodes
+    def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="mean_squared_error", batch_size=None, verbose=0):
+        self.n_neurons = n_neurons
         self.verbose = verbose
         self.n_epochs = epochs
-        self.k = n_nodes
+        self.k = n_neurons
         self.batch_size = batch_size
         self.loss = loss
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
@@ -50,7 +50,7 @@ class NN_LinearLinear(BaseModel):
         X, Y = self.input_check(X, Y)
 
         self.model = Sequential()
-        self.model.add(Dense(self.n_nodes, activation="linear", input_dim=len(X.T)))
+        self.model.add(Dense(self.n_neurons, activation="linear", input_dim=len(X.T)))
         self.model.add(Dense(1, activation="linear"))
         self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
 
