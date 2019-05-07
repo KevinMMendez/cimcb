@@ -237,12 +237,12 @@ def roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=450, height=350,
     fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
 
     # Figure: add 95CI band
-    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
+    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.05, line_width=1, line_color="black", fill_color="green", source=source)
     fig.add_layout(figband)
 
     # Figure: add oob line
     figline2 = fig.line("x_oob", "y_oob", color="red", line_width=3.5, alpha=0.6, legend="ROC Curve (OOB)", source=source)
-    figband2 = Band(base="x_oob", lower="lowci_oob", upper="uppci_oob", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="red", source=source)
+    figband2 = Band(base="x_oob", lower="lowci_oob", upper="uppci_oob", level="underlay", fill_alpha=0.05, line_width=1, line_color="black", fill_color="red", source=source)
     fig.add_layout(figband2)
 
     # Figure: add errorbar  spec =  1 - fpr
@@ -262,10 +262,32 @@ def roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=450, height=350,
                     tpr_lowci_eb = 1
                     tpr_uppci_eb = 1
 
-        roc_whisker_line = fig.multi_line([[fpr_eb, fpr_eb]], [[tpr_lowci_eb, tpr_uppci_eb]], line_alpha=1, line_color="black")
-        roc_whisker_bot = fig.multi_line([[fpr_eb - 0.03, fpr_eb + 0.03]], [[tpr_lowci_eb, tpr_lowci_eb]], line_color="black")
-        roc_whisker_top = fig.multi_line([[fpr_eb - 0.03, fpr_eb + 0.03]], [[tpr_uppci_eb, tpr_uppci_eb]], line_alpha=1, line_color="black")
+        roc_whisker_line = fig.multi_line([[fpr_eb, fpr_eb]], [[tpr_lowci_eb, tpr_uppci_eb]], line_alpha=1, line_width=2, line_color="darkgreen")
+        roc_whisker_bot = fig.multi_line([[fpr_eb - 0.03, fpr_eb + 0.03]], [[tpr_lowci_eb, tpr_lowci_eb]], line_width=2, line_color="darkgreen")
+        roc_whisker_top = fig.multi_line([[fpr_eb - 0.03, fpr_eb + 0.03]], [[tpr_uppci_eb, tpr_uppci_eb]], line_width=2, line_alpha=1, line_color="darkgreen")
         fig.circle([fpr_eb], [tpr_eb], size=8, fill_alpha=1, line_alpha=1, line_color="black", fill_color="white")
+
+    # Figure: add errorbar  spec =  1 - fpr
+    if errorbar is not False:
+        idx = np.abs(fpr - (1 - errorbar)).argmin()  # this find the closest value in fpr to errorbar fpr
+        fpr_eb2 = fpr[idx]
+        tpr_eb2 = tpr_oob[idx]
+        tpr_lowci_eb2 = tpr_oob_lowci[idx]
+        tpr_uppci_eb2 = tpr_oob_uppci[idx]
+
+        # Edge case: If this is a perfect roc curve, and specificity >= 1, make sure error_bar is at (0,1) not (0,0)
+        if errorbar >= 1:
+            for i in range(len(fpr)):
+                if fpr[i] == 0 and tpr_oob[i] == 1:
+                    fpr_eb2 = 0
+                    tpr_eb2 = 1
+                    tpr_lowci_eb2 = 1
+                    tpr_uppci_eb2 = 1
+
+        roc_whisker_line2 = fig.multi_line([[fpr_eb2, fpr_eb2]], [[tpr_lowci_eb2, tpr_uppci_eb2]], line_width=2, line_alpha=1, line_color="darkred")
+        roc_whisker_bot2 = fig.multi_line([[fpr_eb2 - 0.03, fpr_eb2 + 0.03]], [[tpr_lowci_eb2, tpr_lowci_eb2]], line_width=2, line_color="darkred")
+        roc_whisker_top2 = fig.multi_line([[fpr_eb2 - 0.03, fpr_eb2 + 0.03]], [[tpr_uppci_eb2, tpr_uppci_eb2]], line_width=2, line_alpha=1, line_color="darkred")
+        fig.circle([fpr_eb2], [tpr_eb2], size=8, fill_alpha=1, line_alpha=1, line_color="black", fill_color="white")
 
     # Change font size
     fig.title.text_font_size = "11pt"
@@ -334,8 +356,8 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     x_loc = pd.DataFrame(Xtrue)
     x0_loc = list(x_loc[Ytrue == 0].index)
     x1_loc = list(x_loc[Ytrue == 1].index)
-    x_loc_ib_dict =  {k: [] for k in list(x_loc.index)}
-    x_loc_oob_dict =  {k: [] for k in list(x_loc.index)}
+    x_loc_ib_dict = {k: [] for k in list(x_loc.index)}
+    x_loc_oob_dict = {k: [] for k in list(x_loc.index)}
     # stratified resample
     x0 = Xtrue[Ytrue == 0]
     x1 = Xtrue[Ytrue == 1]
