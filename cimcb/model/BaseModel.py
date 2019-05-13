@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 import numpy as np
 import pandas as pd
 import scipy
+import collections
 from copy import deepcopy, copy
 from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.models import HoverTool, Band
@@ -473,3 +474,23 @@ class BaseModel(ABC):
         fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]], toolbar_location="right")
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
+
+    def save_table(self, name="table.xlsx"):
+        try:
+            table_a = pd.DataFrame(self.table)
+        except AttributeError:
+            table_a = pd.DataFrame()
+        try:
+            table_b = pd.DataFrame(self.table_booteval)
+        except AttributeError:
+            table_b = pd.DataFrame()
+
+        table = pd.concat([table_a, table_b], ignore_index=True, sort=False)
+        check_type = name.split(".")
+        if check_type[-1] == "xlsx":
+            table.to_excel(name, index=False)
+        elif check_type[-1] == "csv":
+            table.to_csv(name, index=False)
+        else:
+            raise ValueError("name must end in .xlsx or .csv")
+        print("Done! Saved table as {}".format(name))
