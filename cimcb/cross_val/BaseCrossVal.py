@@ -459,7 +459,7 @@ class BaseCrossVal(ABC):
 
         full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta)
         cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta)
-        diff_alpha = color_scale(diff_score, method="linear", beta=color_beta - 2)
+        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta)
         # diff_alpha = 1.1 - diff_alpha
 
         # Text for heatmaps

@@ -5,9 +5,13 @@ def load_comparisonXL(method, evaluate="train"):
     """Load comparison table."""
     # TO DO: Check that evaluate includes 'test'
     if evaluate is "test":
-        e = 1
+        e = "['Test']"
+    elif evaluate is "in bag":
+        e = "['In bag']"
+    elif evaluate is "out of bag":
+        e = "['Out of Bag']"
     else:
-        e = 0
+        e = "['Train']"
 
     # Import methods
     table = []
@@ -17,13 +21,13 @@ def load_comparisonXL(method, evaluate="train"):
     # Concatenate table
     df = pd.DataFrame()
     for i in range(len(table)):
-        df = pd.concat([df, table[i].iloc[e]], axis=1, sort=False)
+        df = pd.concat([df, table[i].loc[table[i]['evaluate'] == e].T.squeeze()], axis=1, sort=False)
     df = df.T.drop(columns="evaluate")
 
     # Remove [ ] from string
     for i in range(len(df)):
         for j in range(len(df.T)):
-            df.iloc[i, j] = df.iloc[i, j][2:-2]
+            df.iloc[i, j] = df.iloc[i, j][2: -2]
 
     # Reset index and add methods column
     df = df.reset_index()
