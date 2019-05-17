@@ -4,6 +4,7 @@ from bokeh.models import Band, HoverTool
 from tqdm import tqdm
 from copy import deepcopy, copy
 from bokeh.plotting import ColumnDataSource, figure
+import scipy
 from scipy import interp
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix, roc_auc_score
@@ -237,12 +238,12 @@ def roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=450, height=350,
     fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
 
     # Figure: add 95CI band
-    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.05, line_width=1, line_color="black", fill_color="green", source=source)
+    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
     fig.add_layout(figband)
 
     # Figure: add oob line
     figline2 = fig.line("x_oob", "y_oob", color="red", line_width=3.5, alpha=0.6, legend="ROC Curve (OOB)", source=source)
-    figband2 = Band(base="x_oob", lower="lowci_oob", upper="uppci_oob", level="underlay", fill_alpha=0.05, line_width=1, line_color="black", fill_color="red", source=source)
+    figband2 = Band(base="x_oob", lower="lowci_oob", upper="uppci_oob", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="red", source=source)
     fig.add_layout(figband2)
 
     # Figure: add errorbar  spec =  1 - fpr
@@ -371,6 +372,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     fpr_oob = []
     stat_oob_boot = []
     median_oob = []
+    manw_pval = []
     for i in tqdm(range(bootnum)):
         # resample
         x0_idx_ib = resample(x0_idx)
@@ -396,7 +398,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
         ypred_oob = model_boot.test(x_oob)
         # get median ypred per group
         ypred_ib_0 = ypred_ib[: len(x0_idx_ib)]
-        ypred_ib_1 = ypred_ib[len(x0_idx_ib) :]
+        ypred_ib_1 = ypred_ib[len(x0_idx_ib):]
         median_ib.append([np.median(ypred_ib_0), np.median(ypred_ib_1)])
         # get average ypred
         for i in range(len(ypred_ib_0)):
@@ -418,7 +420,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
             stat_ib_boot.append(stats_resi)
         # get median ypred per group
         ypred_oob_0 = ypred_oob[: len(x0_idx_oob)]
-        ypred_oob_1 = ypred_oob[len(x0_idx_oob) :]
+        ypred_oob_1 = ypred_oob[len(x0_idx_oob):]
         median_oob.append([np.median(ypred_oob_0), np.median(ypred_oob_1)])
         # get average ypred
         for i in range(len(ypred_oob_0)):
@@ -438,6 +440,10 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
         if metric is not None:
             stats_reso = get_stats(y_oob, ypred_oob, specificity, parametric)
             stat_oob_boot.append(stats_reso)
+        # manu
+        manw_pval_ib = scipy.stats.mannwhitneyu(ypred_ib_0, ypred_ib_1, alternative="two-sided")[1]
+        manw_pval_oob = scipy.stats.mannwhitneyu(ypred_oob_0, ypred_oob_1, alternative="two-sided")[1]
+        manw_pval.append([manw_pval_ib, manw_pval_oob])
 
     # Get CI for bootstat ib
     if metric is not None:
@@ -506,7 +512,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     if metric is None:
         return fpr, tpr, tpr_ci
     else:
-        return fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob
+        return fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval
 
 
 def get_sens_spec(Ytrue, Yscore, cuttoff_val):

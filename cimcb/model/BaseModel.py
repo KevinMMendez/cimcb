@@ -328,7 +328,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def booteval(self, X, Y, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters
@@ -362,9 +362,22 @@ class BaseModel(ABC):
             val = 0.8
 
         # ROC plot
-        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
-        roc_title = "AUC: {} ({})".format(np.round(stat_ib["AUC"][0], 2), np.round(stat_oob["AUC"][0], 2))
-        roc_bokeh = roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=320, height=315, title=roc_title, errorbar=stats["val_specificity"], label_font_size="10pt")
+        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
+
+        self.fpr_oob = np.insert(fpr_ib[0], 0, 0)
+        self.tpr_oob = tpr_oob_ci[0]
+        self.fpr_ib = np.insert(fpr_ib[0], 0, 0)
+        self.tpr_ib = tpr_ib_ci[0]
+        auc_ib_median = metrics.auc(self.fpr_ib, self.tpr_ib)
+        auc_oob_median = metrics.auc(self.fpr_oob, self.tpr_oob)
+
+        if errorbar is True:
+            val_bar = stats["val_specificity"]
+        else:
+            val_bar = False
+
+        roc_title = "AUC: {} ({})".format(np.round(auc_ib_median, 2), np.round(auc_oob_median, 2))
+        roc_bokeh = roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=320, height=315, title=roc_title, errorbar=val_bar, label_font_size="10pt")
 
         # train is ib, test is oob
         Yscore_train_dict = {}
@@ -416,6 +429,23 @@ class BaseModel(ABC):
         dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt")
         dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
+        # Manu
+        manw_ib = []
+        manw_oob = []
+        for i in range(len(manw_pval)):
+            manw_ib.append(manw_pval[i][0])
+            manw_oob.append(manw_pval[i][1])
+        manw_ib_med = np.percentile(manw_ib, 50, axis=0)
+        manw_oob_med = np.percentile(manw_oob, 50, axis=0)
+        if manw_ib_med > 0.01:
+            manw_ib_pval_round = "%0.2f" % manw_ib_med
+        else:
+            manw_ib_pval_round = "%0.2e" % manw_ib_med
+        if manw_oob_med > 0.01:
+            manw_oob_pval_round = "%0.2f" % manw_oob_med
+        else:
+            manw_oob_pval_round = "%0.2e" % manw_oob_med
+
         # Round stats, and stats_bootci for Table
         stats_round_ib = {}
         for i in stat_ib.keys():
@@ -427,43 +457,67 @@ class BaseModel(ABC):
             stats_round_oob[i] = np.round(stat_oob[i], 2)
 
         # Create table
-        tabledata = dict(
-            evaluate=[["In Bag"]],
-            auc=[["{} ({}, {})".format(stats_round_ib["AUC"][0], stats_round_ib["AUC"][1], stats_round_ib["AUC"][2])]],
-            accuracy=[["{} ({}, {})".format(stats_round_ib["ACCURACY"][0], stats_round_ib["ACCURACY"][1], stats_round_ib["ACCURACY"][2])]],
-            precision=[["{} ({}, {})".format(stats_round_ib["PRECISION"][0], stats_round_ib["PRECISION"][1], stats_round_ib["PRECISION"][2])]],
-            sensitivity=[["{} ({}, {})".format(stats_round_ib["SENSITIVITY"][0], stats_round_ib["SENSITIVITY"][1], stats_round_ib["SENSITIVITY"][2])]],
-            specificity=[["{}".format(stats_round_ib["SPECIFICITY"][0])]],
-            F1score=[["{} ({}, {})".format(stats_round_ib["F1-SCORE"][0], stats_round_ib["F1-SCORE"][1], stats_round_ib["F1-SCORE"][2])]],
-            R2=[["{} ({}, {})".format(stats_round_ib["R²"][0], stats_round_ib["R²"][1], stats_round_ib["R²"][2])]],
-        )
+        if errorbar is False:
+            tabledata = dict(
+                evaluate=[["In Bag"]],
+                manw_pval=[["{}".format(manw_ib_pval_round)]],
+                auc=[["{} ({}, {})".format(np.round(auc_ib_median, 2), stats_round_ib["AUC"][1], stats_round_ib["AUC"][2])]],
+                R2=[["{} ({}, {})".format(stats_round_ib["R²"][0], stats_round_ib["R²"][1], stats_round_ib["R²"][2])]],
+            )
 
-        # Append test data
-        tabledata["evaluate"].append(["Out of Bag"])
-        tabledata["auc"].append(["{} ({}, {})".format(stats_round_oob["AUC"][0], stats_round_oob["AUC"][1], stats_round_oob["AUC"][2])])
-        tabledata["accuracy"].append(["{} ({}, {})".format(stats_round_oob["ACCURACY"][0], stats_round_oob["ACCURACY"][1], stats_round_oob["ACCURACY"][2])])
-        tabledata["precision"].append(["{} ({}, {})".format(stats_round_oob["PRECISION"][0], stats_round_oob["PRECISION"][1], stats_round_oob["PRECISION"][2])])
-        tabledata["sensitivity"].append(["{} ({}, {})".format(stats_round_oob["SENSITIVITY"][0], stats_round_oob["SENSITIVITY"][1], stats_round_oob["SENSITIVITY"][2])])
-        tabledata["specificity"].append(["{}".format(stats_round_oob["SPECIFICITY"][0])])
-        tabledata["F1score"].append(["{} ({}, {})".format(stats_round_oob["F1-SCORE"][0], stats_round_oob["F1-SCORE"][1], stats_round_oob["F1-SCORE"][2])])
-        tabledata["R2"].append(["{} ({}, {})".format(stats_round_oob["R²"][0], stats_round_oob["R²"][1], stats_round_oob["R²"][2])])
+            # Append test data
+            tabledata["evaluate"].append(["Out of Bag"])
+            tabledata["manw_pval"].append([manw_oob_pval_round])
+            tabledata["auc"].append(["{} ({}, {})".format(np.round(auc_oob_median, 2), stats_round_oob["AUC"][1], stats_round_oob["AUC"][2])])
+            tabledata["R2"].append(["{} ({}, {})".format(stats_round_oob["R²"][0], stats_round_oob["R²"][1], stats_round_oob["R²"][2])])
+        else:
+            tabledata = dict(
+                evaluate=[["In Bag"]],
+                auc=[["{} ({}, {})".format(np.round(auc_ib_median, 2), stats_round_ib["AUC"][1], stats_round_ib["AUC"][2])]],
+                manw_pval=[["{}".format(manw_ib_pval_round)]],
+                accuracy=[["{} ({}, {})".format(stats_round_ib["ACCURACY"][0], stats_round_ib["ACCURACY"][1], stats_round_ib["ACCURACY"][2])]],
+                precision=[["{} ({}, {})".format(stats_round_ib["PRECISION"][0], stats_round_ib["PRECISION"][1], stats_round_ib["PRECISION"][2])]],
+                sensitivity=[["{} ({}, {})".format(stats_round_ib["SENSITIVITY"][0], stats_round_ib["SENSITIVITY"][1], stats_round_ib["SENSITIVITY"][2])]],
+                specificity=[["{}".format(stats_round_ib["SPECIFICITY"][0])]],
+                F1score=[["{} ({}, {})".format(stats_round_ib["F1-SCORE"][0], stats_round_ib["F1-SCORE"][1], stats_round_ib["F1-SCORE"][2])]],
+                R2=[["{} ({}, {})".format(stats_round_ib["R²"][0], stats_round_ib["R²"][1], stats_round_ib["R²"][2])]],
+            )
+
+            # Append test data
+            tabledata["evaluate"].append(["Out of Bag"])
+            tabledata["manw_pval"].append([manw_oob_pval_round])
+            tabledata["auc"].append(["{} ({}, {})".format(np.round(auc_oob_median, 2), stats_round_oob["AUC"][1], stats_round_oob["AUC"][2])])
+            tabledata["accuracy"].append(["{} ({}, {})".format(stats_round_oob["ACCURACY"][0], stats_round_oob["ACCURACY"][1], stats_round_oob["ACCURACY"][2])])
+            tabledata["precision"].append(["{} ({}, {})".format(stats_round_oob["PRECISION"][0], stats_round_oob["PRECISION"][1], stats_round_oob["PRECISION"][2])])
+            tabledata["sensitivity"].append(["{} ({}, {})".format(stats_round_oob["SENSITIVITY"][0], stats_round_oob["SENSITIVITY"][1], stats_round_oob["SENSITIVITY"][2])])
+            tabledata["specificity"].append(["{}".format(stats_round_oob["SPECIFICITY"][0])])
+            tabledata["F1score"].append(["{} ({}, {})".format(stats_round_oob["F1-SCORE"][0], stats_round_oob["F1-SCORE"][1], stats_round_oob["F1-SCORE"][2])])
+            tabledata["R2"].append(["{} ({}, {})".format(stats_round_oob["R²"][0], stats_round_oob["R²"][1], stats_round_oob["R²"][2])])
 
         # Save Table
         self.table_booteval = tabledata
 
         # Plot table
         source = ColumnDataSource(data=tabledata)
-        columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC"), TableColumn(field="accuracy", title="Accuracy"), TableColumn(field="precision", title="Precision"), TableColumn(field="F1score", title="F1score"), TableColumn(field="sensitivity", title="Sensitivity"), TableColumn(field="specificity", title="Specificity")]
-        table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+        if errorbar is True:
+            columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC"), TableColumn(field="accuracy", title="Accuracy"), TableColumn(field="precision", title="Precision"), TableColumn(field="F1score", title="F1score"), TableColumn(field="sensitivity", title="Sensitivity"), TableColumn(field="specificity", title="Specificity")]
+            table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+        else:
+            columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC")]
+            table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
 
         # Title
-        if specificity is not False:
+        if errorbar is False:
+            title_bokeh = ""
+        elif specificity is not False:
             title = "Specificity fixed to: {}".format(np.round(val, 2))
+            title_bokeh = "<h3>{}</h3>".format(title)
         elif cutoffscore is not False:
             title = "Score cut-off fixed to: {}".format(np.round(val, 2))
+            title_bokeh = "<h3>{}</h3>".format(title)
         else:
             title = "Specificity fixed to: {}".format(np.round(val, 2))
-        title_bokeh = "<h3>{}</h3>".format(title)
+            title_bokeh = "<h3>{}</h3>".format(title)
 
         if title_align == "center":
             violin_bokeh.title.align = "center"
