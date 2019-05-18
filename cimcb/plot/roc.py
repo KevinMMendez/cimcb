@@ -441,8 +441,14 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
             stats_reso = get_stats(y_oob, ypred_oob, specificity, parametric)
             stat_oob_boot.append(stats_reso)
         # manu
-        manw_pval_ib = scipy.stats.mannwhitneyu(ypred_ib_0, ypred_ib_1, alternative="two-sided")[1]
-        manw_pval_oob = scipy.stats.mannwhitneyu(ypred_oob_0, ypred_oob_1, alternative="two-sided")[1]
+        try:
+            manw_pval_ib = scipy.stats.mannwhitneyu(ypred_ib_0, ypred_ib_1, alternative="two-sided")[1]
+        except ValueError:
+            manw_pval_ib = 0
+        try:
+            manw_pval_oob = scipy.stats.mannwhitneyu(ypred_oob_0, ypred_oob_1, alternative="two-sided")[1]
+        except ValueError:
+            0
         manw_pval.append([manw_pval_ib, manw_pval_oob])
 
     # Get CI for bootstat ib
