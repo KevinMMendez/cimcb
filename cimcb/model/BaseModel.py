@@ -423,11 +423,13 @@ class BaseModel(ABC):
         # Violin plot
         violin_title = "Cut-off: {}".format(np.round(stats["val_cutoffscore"], 2))
         violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Median Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["IB (0)", "OOB (0)", "IB (1)", "OOB (1)"], group_name_sort=["IB (0)", "IB (1)", "OOB (0)", "OOB (1)"], title=violin_title, font_size="11pt", label_font_size="10pt")
-        violin_bokeh.multi_line([[-100, 100]], [[stats["val_cutoffscore"], stats["val_cutoffscore"]]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
+        if errorbar is True:
+            violin_bokeh.multi_line([[-100, 100]], [[stats["val_cutoffscore"], stats["val_cutoffscore"]]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
         # Distribution plot
         dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt")
-        dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
+        if errorbar is True:
+            dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
         # Manu
         manw_ib = []
