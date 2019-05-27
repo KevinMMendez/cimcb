@@ -22,7 +22,8 @@ setup(
                       "tensorflow",
                       "tqdm",
                       "xlrd",
-                      "joblib"],
+                      "joblib",
+                      "nomkl"],
     author="Kevin Mendez, David Broadhurst",
     author_email="k.mendez@ecu.edu.au, d.broadhurst@ecu.edu.au",
 )
