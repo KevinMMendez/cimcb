@@ -102,7 +102,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=1, ci=95):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -344,10 +344,16 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=1, ci=95):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95):
 
         # legend always None
         legend = None
+
+        # check color_beta
+        if type(color_beta) != list:
+            raise ValueError("color_beta needs to be a list of 3 values e.g. [10, 10, 10]")
+        if len(color_beta) != 3:
+            raise ValueError("color_beta needs to be a list of 3 values e.g. [10, 10, 10]")
 
         # Get ci
         if self.n_mc > 1:
@@ -457,9 +463,9 @@ class BaseCrossVal(ABC):
         # for i in diff_alpha_input.index:
         #     diff_alpha_input[i] = -diff_alpha_input[i]
 
-        full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta)
-        cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta)
-        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta)
+        full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta[0])
+        cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta[1])
+        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta[2])
         # diff_alpha = 1.1 - diff_alpha
 
         # Text for heatmaps
