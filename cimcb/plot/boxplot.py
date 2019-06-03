@@ -87,23 +87,26 @@ def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", fo
     fig = figure(title=title, x_range=group_name, x_axis_label=xlabel, y_axis_label=ylabel, plot_width=width, plot_height=height, y_range=y_range)
 
     # Plot probability density shade if violin is True
-    if violin is True:
-        vwidth = 0.5
-        table["group"] = table.group.astype("category")
-        for i in table["group"].cat.categories:
-            y_data = table[table["group"] == i]["X"]
-            y_min, y_max = y_data.min(), y_data.max()
-            y_padding = (y_max - y_min) * 0.15
-            y_grid = np.linspace(y_min - y_padding, y_max + y_padding, 60)
-            pdf = stats.gaussian_kde(y_data, "scott")
-            x_pdf = pdf(y_grid)
-            x_pdf = x_pdf / x_pdf.max() * vwidth / (2 / width_violin)
-            x_patch = np.append(x_pdf, -x_pdf[::-1])
-            y_patch = np.append(y_grid, y_grid[::-1])
-            for j in range(len(group_name)):
-                if group_name[j] == str(i):
-                    val = j
-            fig.patch((x_patch + val + 0.5), y_patch, alpha=0.3, color=color_violin[val], line_color="grey", line_width=1)
+    try:
+        if violin is True:
+            vwidth = 0.5
+            table["group"] = table.group.astype("category")
+            for i in table["group"].cat.categories:
+                y_data = table[table["group"] == i]["X"]
+                y_min, y_max = y_data.min(), y_data.max()
+                y_padding = (y_max - y_min) * 0.15
+                y_grid = np.linspace(y_min - y_padding, y_max + y_padding, 60)
+                pdf = stats.gaussian_kde(y_data, "scott")
+                x_pdf = pdf(y_grid)
+                x_pdf = x_pdf / x_pdf.max() * vwidth / (2 / width_violin)
+                x_patch = np.append(x_pdf, -x_pdf[::-1])
+                y_patch = np.append(y_grid, y_grid[::-1])
+                for j in range(len(group_name)):
+                    if group_name[j] == str(i):
+                        val = j
+                fig.patch((x_patch + val + 0.5), y_patch, alpha=0.3, color=color_violin[val], line_color="grey", line_width=1)
+    except np.linalg.LinAlgError as err:
+        pass
 
     ## Boxplot (Stems, Boxes, Whiskers, and Outliers) ##
     # Stems

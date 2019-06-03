@@ -22,6 +22,11 @@ def distribution(X, group, kde=True, title="Density Plot", xlabel="x", ylabel="P
     if len(group_unique) == 4:
         x3 = X[group == group_unique[2]]
         x4 = X[group == group_unique[3]]
+        x3 = np.append(x3, [x3[0] + 0.05, x3[0] - 0.05])
+        x4 = np.append(x4, [x4[0] + 0.05, x4[0] - 0.05])
+
+    x1 = np.append(x1, [x1[0] + 0.05, x1[0] - 0.05])
+    x2 = np.append(x2, [x2[0] + 0.05, x2[0] - 0.05])
 
     # Density curve
     x1_min, x1_max = x1.min(), x1.max()
