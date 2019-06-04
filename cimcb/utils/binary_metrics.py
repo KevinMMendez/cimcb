@@ -56,7 +56,7 @@ def binary_metrics(y_true, y_pred, cut_off=0.5, parametric=True, k=None):
     try:
         stats["AUC"] = roc_auc_score(y_true_arr, y_pred_arr)
     except ValueError:
-        raise ValueError("Kevin: This error says there are nans. Something is not right if y predicted are nans.")
+        raise ValueError("You need to lower the learning_rate! This is a common issue when using the ‘mean_squared_error’ loss function called exploding gradients. 'At an extreme, the values of weights can become so large as to overflow and result in NaN values' (REF: https://machinelearningmastery.com/exploding-gradients-in-neural-networks/).")
 
     stats["ACCURACY"] = safe_div((tp + tn), (tp + tn + fp + fn))
     stats["PRECISION"] = safe_div((tp), (tp + fp))
