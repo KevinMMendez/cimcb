@@ -10,7 +10,7 @@ from ..utils import YpredCallback
 class NN_LinearLinear(BaseModel):
     """2 Layer linear-linear neural network using Keras"""
 
-    parametric = False
+    parametric = True
     bootlist = None
 
     def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="mean_squared_error", batch_size=None, verbose=0):

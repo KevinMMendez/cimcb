@@ -8,7 +8,7 @@ from .BaseModel import BaseModel
 class RF(BaseModel):
     """Random forest"""
 
-    parametric = False
+    parametric = True
     bootlist = None  # list of metrics to bootstrap
 
     def __init__(self, n_estimators=100, max_features="auto", max_depth=None, criterion="gini", min_samples_split=2, min_samples_leaf=1, max_leaf_nodes=None, n_jobs=None):

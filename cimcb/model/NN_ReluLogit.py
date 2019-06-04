@@ -3,12 +3,14 @@ from keras.callbacks import Callback
 from keras.optimizers import SGD
 from keras.models import Sequential
 from keras.layers import Dense
+import tensorflow as tf
+from keras import backend as K
 from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
 
-class NN_LogitLogit(BaseModel):
-    """2 Layer logistic-logistic neural network using Keras"""
+class NN_ReluLogit(BaseModel):
+    """2 Layer linear-logistic neural network using Keras"""
 
     parametric = True
     bootlist = None
@@ -42,12 +44,17 @@ class NN_LogitLogit(BaseModel):
             Predicted y score for samples.
         """
 
+        # # If using Keras, set tf to 1 core
+        # config = K.tf.ConfigProto(intra_op_parallelism_threads=8, inter_op_parallelism_threads=8, allow_soft_placement=True)
+        # session = tf.Session(config=config)
+        # K.set_session(session)
+
         # If batch-size is None:
         if self.batch_size is None:
             self.batch_size = len(X)
 
         self.model = Sequential()
-        self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
+        self.model.add(Dense(self.n_neurons, activation="relu", input_dim=len(X.T)))
         self.model.add(Dense(1, activation="sigmoid"))
         self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
 

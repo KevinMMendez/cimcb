@@ -12,7 +12,7 @@ from ..utils import YpredCallback
 class NN_LinearLogit(BaseModel):
     """2 Layer linear-logistic neural network using Keras"""
 
-    parametric = False
+    parametric = True
     bootlist = None
 
     def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):

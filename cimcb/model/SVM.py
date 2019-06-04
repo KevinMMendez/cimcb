@@ -8,7 +8,7 @@ from .BaseModel import BaseModel
 class SVM(BaseModel):
     """Support Vector Machine"""
 
-    parametric = False
+    parametric = True
     bootlist = None  # list of metrics to bootstrap
 
     def __init__(self, C=1.0, kernel="rbf", degree=3, gamma="auto", tol=0.001, max_iter=-1):
