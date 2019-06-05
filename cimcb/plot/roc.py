@@ -124,7 +124,10 @@ def roc_calculate(Ytrue, Yscore, bootnum=1000, metric=None, val=None, parametric
     """
 
     # Get fpr, tpr
-    fpr, tpr, threshold = metrics.roc_curve(Ytrue, Yscore, pos_label=1, drop_intermediate=False)
+    try:
+        fpr, tpr, threshold = metrics.roc_curve(Ytrue, Yscore, pos_label=1, drop_intermediate=False)
+    except ValueError:
+        raise ValueError("You need to lower the learning_rate! This is a common issue when using the ‘mean_squared_error’ loss function called exploding gradients. 'At an extreme, the values of weights can become so large as to overflow and result in NaN values' (REF: https://machinelearningmastery.com/exploding-gradients-in-neural-networks/).")
 
     # fpr, tpr with drop_intermediates for fpr = 0 (useful for plot... since we plot specificity on x-axis, we don't need intermediates when fpr=0)
     tpr0 = tpr[fpr == 0][-1]
@@ -406,7 +409,15 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
 
     self = para_class(x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc)
 
-    para_output = Parallel(n_jobs=self.n_cores)(delayed(self._roc_calculate_boot_loop)(i) for i in tqdm(range(bootnum)))
+    try:
+        para_output = Parallel(n_jobs=self.n_cores)(delayed(self._roc_calculate_boot_loop)(i) for i in tqdm(range(bootnum)))
+    except:
+        print("There was an error while using parallel, so this will now revert back to NOT using parallel processing. If this is with ANNs, I'm currently trying to fix this.")
+        time.sleep(0.5)
+        para_output = []
+        for i in tqdm(range(bootnum)):
+            para_temp = self._roc_calculate_boot_loop(i)
+            para_output.append(para_temp)
 
     tpr_ib = []
     fpr_ib = []
