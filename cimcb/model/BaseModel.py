@@ -324,7 +324,7 @@ class BaseModel(ABC):
             roc_bokeh.title.align = "center"
 
         # Combine table, violin plot and roc plot into one figure
-        fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]], toolbar_location="right")
+        fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]])
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
@@ -527,7 +527,7 @@ class BaseModel(ABC):
             roc_bokeh.title.align = "center"
 
         # Combine table, violin plot and roc plot into one figure
-        fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]], toolbar_location="right")
+        fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]])
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
