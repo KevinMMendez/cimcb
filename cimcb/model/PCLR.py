@@ -28,7 +28,7 @@ class PCLR(BaseModel):
     plot_permutation_test : Perform a permutation test and plot.
     """
 
-    parametric = False
+    parametric = True
     bootlist = ["model.coef_"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2):
