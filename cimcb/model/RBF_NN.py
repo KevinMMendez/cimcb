@@ -8,7 +8,7 @@ from .BaseModel import BaseModel
 class RBF_NN(BaseModel):
     """Radial basis function neural network"""
 
-    parametric = False
+    parametric = True
     bootlist = None
 
     def __init__(self, n_clusters=8, max_iter=100):
