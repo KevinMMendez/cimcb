@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 from bokeh.models import Band, HoverTool
 from tqdm import tqdm
+import timeit
+import time
+import multiprocessing
+from joblib import Parallel, delayed
 from copy import deepcopy, copy
 from bokeh.plotting import ColumnDataSource, figure
 import scipy
@@ -310,7 +314,7 @@ def roc_plot_boot(fpr_ib, tpr_ib_ci, fpr_oob, tpr_oob_ci, width=450, height=350,
     return fig
 
 
-def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, val=None, parametric=True):
+def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, val=None, parametric=True, n_cores=-1):
     """Calculates required metrics for the roc plot function (fpr, tpr, and tpr_ci).
 
     Parameters
@@ -332,6 +336,21 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     tpr_ci : array-like, shape = [n_samples, 2]
         True positive rates 95% confidence intervals [lowci, uppci].
     """
+    # if n_cores = -1, set n_cores to max_cores
+    max_num_cores = multiprocessing.cpu_count()
+    n_cores = n_cores
+    if n_cores > max_num_cores:
+        n_cores = -1
+        print("Number of cores set too high. It will be set to the max number of cores in the system.", flush=True)
+    if n_cores == -1:
+        n_cores = max_num_cores
+        print("Number of cores set to: {}".format(max_num_cores))
+
+    time.sleep(0.5)  # Sleep for 0.5 secs to finish printing
+
+    # Start Timer
+    start = timeit.default_timer()
+
     # model copy
     model_boot = copy(model)
 
@@ -364,6 +383,31 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     x1 = Xtrue[Ytrue == 1]
     x0_idx = list(range(len(x0)))
     x1_idx = list(range(len(x1)))
+
+    # input for parallel
+    class para_class:
+        def __init__(self, x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc):
+            self.x0_idx = x0_idx
+            self.x1_idx = x1_idx
+            self.model_boot = model_boot
+            self.x0 = x0
+            self.x1 = x1
+            self.metric = metric
+            self.specificity = specificity
+            self.parametric = parametric
+            self.mean_fpr = mean_fpr
+            self.n_cores = n_cores
+            self.x0_loc = x0_loc
+            self.x1_loc = x1_loc
+
+        def _roc_calculate_boot_loop(self, i):
+            val = _roc_calculate_boot_loop(self)
+            return val
+
+    self = para_class(x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc)
+
+    para_output = Parallel(n_jobs=self.n_cores)(delayed(self._roc_calculate_boot_loop)(i) for i in tqdm(range(bootnum)))
+
     tpr_ib = []
     fpr_ib = []
     stat_ib_boot = []
@@ -373,83 +417,29 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     stat_oob_boot = []
     median_oob = []
     manw_pval = []
-    for i in tqdm(range(bootnum)):
-        # resample
-        x0_idx_ib = resample(x0_idx)
-        x1_idx_ib = resample(x1_idx)
-        x0_idx_oob = list(set(x0_idx) - set(x0_idx_ib))
-        x1_idx_oob = list(set(x1_idx) - set(x1_idx_ib))
-        # get x
-        x0_ib = x0[x0_idx_ib]
-        x1_ib = x1[x1_idx_ib]
-        x0_oob = x0[x0_idx_oob]
-        x1_oob = x1[x1_idx_oob]
-        x_ib = np.concatenate((x0_ib, x1_ib))
-        x_oob = np.concatenate((x0_oob, x1_oob))
-        # get y
-        y0_ib = np.zeros(len(x0_idx_ib))
-        y1_ib = np.ones(len(x1_idx_ib))
-        y0_oob = np.zeros(len(x0_idx_oob))
-        y1_oob = np.ones(len(x1_idx_oob))
-        y_ib = np.concatenate((y0_ib, y1_ib))
-        y_oob = np.concatenate((y0_oob, y1_oob))
-        # train and test model
-        ypred_ib = model_boot.train(x_ib, y_ib)
-        ypred_oob = model_boot.test(x_oob)
-        # get median ypred per group
-        ypred_ib_0 = ypred_ib[: len(x0_idx_ib)]
-        ypred_ib_1 = ypred_ib[len(x0_idx_ib):]
-        median_ib.append([np.median(ypred_ib_0), np.median(ypred_ib_1)])
-        # get average ypred
-        for i in range(len(ypred_ib_0)):
-            idx_res = x0_idx_ib[i]
-            idx_true = x0_loc[idx_res]
-            x_loc_ib_dict[idx_true].append(ypred_ib_0[i])
-        for i in range(len(ypred_ib_1)):
-            idx_res = x1_idx_ib[i]
-            idx_true = x1_loc[idx_res]
-            x_loc_ib_dict[idx_true].append(ypred_ib_1[i])
-        # get ib fpr, tpr, stats
-        fpri, tpri, _ = metrics.roc_curve(y_ib, ypred_ib, pos_label=1, drop_intermediate=False)
-        fpr_ib.append(mean_fpr)
-        tpr_ib.append(interp(mean_fpr, fpri, tpri))
-        # tpr_ib[-1][0] = 0.0
-        # if metric is provided, calculate stats
-        if metric is not None:
-            stats_resi = get_stats(y_ib, ypred_ib, specificity, parametric)
-            stat_ib_boot.append(stats_resi)
-        # get median ypred per group
-        ypred_oob_0 = ypred_oob[: len(x0_idx_oob)]
-        ypred_oob_1 = ypred_oob[len(x0_idx_oob):]
-        median_oob.append([np.median(ypred_oob_0), np.median(ypred_oob_1)])
-        # get average ypred
-        for i in range(len(ypred_oob_0)):
-            idx_res = x0_idx_oob[i]
-            idx_true = x0_loc[idx_res]
-            x_loc_oob_dict[idx_true].append(ypred_oob_0[i])
-        for i in range(len(ypred_oob_1)):
-            idx_res = x1_idx_oob[i]
-            idx_true = x1_loc[idx_res]
-            x_loc_oob_dict[idx_true].append(ypred_oob_1[i])
-        # get oob
-        fpro, tpro, _ = metrics.roc_curve(y_oob, ypred_oob, pos_label=1, drop_intermediate=False)
-        fpr_oob.append(mean_fpr)
-        tpr_oob.append(interp(mean_fpr, fpro, tpro))
-        tpr_oob[-1][0] = 0.0
-        # if metric is provided, calculate stats
-        if metric is not None:
-            stats_reso = get_stats(y_oob, ypred_oob, specificity, parametric)
-            stat_oob_boot.append(stats_reso)
-        # manu
-        try:
-            manw_pval_ib = scipy.stats.mannwhitneyu(ypred_ib_0, ypred_ib_1, alternative="two-sided")[1]
-        except ValueError:
-            manw_pval_ib = 0
-        try:
-            manw_pval_oob = scipy.stats.mannwhitneyu(ypred_oob_0, ypred_oob_1, alternative="two-sided")[1]
-        except ValueError:
-            manw_pval_oob = 0
-        manw_pval.append([manw_pval_ib, manw_pval_oob])
+    temp_x_loc_ib_dict = []
+    temp_x_loc_oob_dict = []
+
+    for i in para_output:
+        tpr_ib.append(i[0])
+        fpr_ib.append(i[1])
+        stat_ib_boot.append(i[2])
+        median_ib.append(i[3])
+        tpr_oob.append(i[4])
+        fpr_oob.append(i[5])
+        stat_oob_boot.append(i[6])
+        median_oob.append(i[7])
+        manw_pval.append(i[8])
+        temp_x_loc_ib_dict.append(i[9])
+        temp_x_loc_oob_dict.append(i[10])
+
+    for i in temp_x_loc_ib_dict:
+        for j in i:
+            x_loc_ib_dict[j[0]].append(j[1])
+
+    for i in temp_x_loc_oob_dict:
+        for j in i:
+            x_loc_oob_dict[j[0]].append(j[1])
 
     # Get CI for bootstat ib
     if metric is not None:
@@ -515,10 +505,119 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     # Concatenate tpr_ci
     tpr_ib_ci = np.array([tpr_ib_medci, tpr_ib_lowci, tpr_ib_uppci])
 
+    # Stop timer
+    stop = timeit.default_timer()
+    self.parallel_time = (stop - start) / 60
+    print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
+
     if metric is None:
         return fpr, tpr, tpr_ci
     else:
         return fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval
+
+
+def _roc_calculate_boot_loop(self):
+    "loop using joblib"
+
+    x0_idx = self.x0_idx
+    x1_idx = self.x1_idx
+    model_boot = self.model_boot
+    x0 = self.x0
+    x1 = self.x1
+    metric = self.metric
+    specificity = self.specificity
+    parametric = self.parametric
+    mean_fpr = self.mean_fpr
+    x0_loc = self.x0_loc
+    x1_loc = self.x1_loc
+
+    # resample
+    x0_idx_ib = resample(x0_idx)
+    x1_idx_ib = resample(x1_idx)
+    x0_idx_oob = list(set(x0_idx) - set(x0_idx_ib))
+    x1_idx_oob = list(set(x1_idx) - set(x1_idx_ib))
+    # get x
+    x0_ib = x0[x0_idx_ib]
+    x1_ib = x1[x1_idx_ib]
+    x0_oob = x0[x0_idx_oob]
+    x1_oob = x1[x1_idx_oob]
+    x_ib = np.concatenate((x0_ib, x1_ib))
+    x_oob = np.concatenate((x0_oob, x1_oob))
+    # get y
+    y0_ib = np.zeros(len(x0_idx_ib))
+    y1_ib = np.ones(len(x1_idx_ib))
+    y0_oob = np.zeros(len(x0_idx_oob))
+    y1_oob = np.ones(len(x1_idx_oob))
+    y_ib = np.concatenate((y0_ib, y1_ib))
+    y_oob = np.concatenate((y0_oob, y1_oob))
+    # train and test model
+    ypred_ib = model_boot.train(x_ib, y_ib)
+    ypred_oob = model_boot.test(x_oob)
+    # get median ypred per group
+    ypred_ib_0 = ypred_ib[: len(x0_idx_ib)]
+    ypred_ib_1 = ypred_ib[len(x0_idx_ib):]
+    k_median_ib = [np.median(ypred_ib_0), np.median(ypred_ib_1)]  # 1
+
+    # get ib fpr, tpr, stats
+    fpri, tpri, _ = metrics.roc_curve(y_ib, ypred_ib, pos_label=1, drop_intermediate=False)
+    k_fpr_ib = mean_fpr
+    k_tpr_ib = interp(mean_fpr, fpri, tpri)
+
+    # tpr_ib[-1][0] = 0.0
+    # if metric is provided, calculate stats
+    if metric is not None:
+        stats_resi = get_stats(y_ib, ypred_ib, specificity, parametric)
+        k_stat_ib_boot = stats_resi
+
+    # get median ypred per group
+    ypred_oob_0 = ypred_oob[: len(x0_idx_oob)]
+    ypred_oob_1 = ypred_oob[len(x0_idx_oob):]
+    k_median_oob = [np.median(ypred_oob_0), np.median(ypred_oob_1)]
+
+    # get oob
+    fpro, tpro, _ = metrics.roc_curve(y_oob, ypred_oob, pos_label=1, drop_intermediate=False)
+    k_fpr_oob = mean_fpr
+    k_tpr_oob = interp(mean_fpr, fpro, tpro)
+    #k_tpr_oob[-1][0] = 0.0
+
+    # if metric is provided, calculate stats
+    if metric is not None:
+        stats_reso = get_stats(y_oob, ypred_oob, specificity, parametric)
+        k_stat_oob_boot = stats_reso
+    # manu
+    try:
+        manw_pval_ib = scipy.stats.mannwhitneyu(ypred_ib_0, ypred_ib_1, alternative="two-sided")[1]
+    except ValueError:
+        manw_pval_ib = 0
+    try:
+        manw_pval_oob = scipy.stats.mannwhitneyu(ypred_oob_0, ypred_oob_1, alternative="two-sided")[1]
+    except ValueError:
+        manw_pval_oob = 0
+    k_manw_pval = [manw_pval_ib, manw_pval_oob]
+
+    # get average ypred
+    k_x_loc_ib_dict = []
+    for i in range(len(ypred_ib_0)):
+        idx_res = x0_idx_ib[i]
+        idx_true = x0_loc[idx_res]
+        k_x_loc_ib_dict.append([idx_true, ypred_ib_0[i]])
+    for i in range(len(ypred_ib_1)):
+        idx_res = x1_idx_ib[i]
+        idx_true = x1_loc[idx_res]
+        k_x_loc_ib_dict.append([idx_true, ypred_ib_1[i]])
+
+    # get average ypred
+    k_x_loc_oob_dict = []
+    for i in range(len(ypred_oob_0)):
+        idx_res = x0_idx_oob[i]
+        idx_true = x0_loc[idx_res]
+        k_x_loc_oob_dict.append([idx_true, ypred_oob_0[i]])
+    for i in range(len(ypred_oob_1)):
+        idx_res = x1_idx_oob[i]
+        idx_true = x1_loc[idx_res]
+        k_x_loc_oob_dict.append([idx_true, ypred_oob_1[i]])
+
+    return [k_tpr_ib, k_fpr_ib, k_stat_ib_boot, k_median_ib, k_tpr_oob, k_fpr_oob, k_stat_oob_boot, k_median_oob, k_manw_pval, k_x_loc_ib_dict, k_x_loc_oob_dict]
 
 
 def get_sens_spec(Ytrue, Yscore, cuttoff_val):
