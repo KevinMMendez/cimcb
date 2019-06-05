@@ -328,7 +328,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left", n_cores=-1):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters
@@ -362,7 +362,7 @@ class BaseModel(ABC):
             val = 0.8
 
         # ROC plot
-        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
+        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric, n_cores=n_cores)
 
         self.fpr_oob = np.insert(fpr_ib[0], 0, 0)
         self.tpr_oob = tpr_oob_ci[0]
