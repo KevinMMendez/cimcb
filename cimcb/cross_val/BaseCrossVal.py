@@ -102,7 +102,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -120,7 +120,7 @@ class BaseCrossVal(ABC):
         if len(self.param_dict2) == 1:
             fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
@@ -344,7 +344,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True):
 
         # legend always None
         legend = None
@@ -380,7 +380,24 @@ class BaseCrossVal(ABC):
         cv_title = self.table.iloc[2 * metric_idx].name
         diff_title = full_title[:-4] + "diff"
 
+        if diff1_heat == False:
+            diff_heat_title = diff_title
+            diff_heat_score = diff_score
+        else:
+            diff_heat_title = "1 - " + full_title[:-4] + "diff"
+            diff_heat_score = 1 - diff_score
         y_axis_text = full_title[:-4]
+
+        if metric is "r2q2":
+            full_title = 'R2'
+            cv_title = 'Q2'
+            diff_title = "| R² - Q² |"
+            if diff1_heat == False:
+                diff_heat_title = diff_title
+            else:
+                diff_heat_title = "1  -   | R² - Q² |"
+            y_axis_text = "R² & Q²"
+
         if model == "kfold":
             full_legend = "FULL"
             cv_legend = "CV"
@@ -389,6 +406,9 @@ class BaseCrossVal(ABC):
             cv_legend = "TEST"
             full_title = full_title[:-4] + "train"
             cv_title = full_title[:-5] + "test"
+            if metric is "r2q2":
+                full_title = 'R2'
+                cv_title = 'Q2'
 
         # round full, cv, and diff for hovertool
         full_hover = []
@@ -465,7 +485,7 @@ class BaseCrossVal(ABC):
 
         full_alpha = color_scale(full_score, method=color_scaling, beta=color_beta[0])
         cv_alpha = color_scale(cv_score, method=color_scaling, beta=color_beta[1])
-        diff_alpha = color_scale(diff_score, method=color_scaling, beta=color_beta[2])
+        diff_alpha = color_scale(diff_heat_score, method=color_scaling, beta=color_beta[2])
         # diff_alpha = 1.1 - diff_alpha
 
         # Text for heatmaps
@@ -617,6 +637,7 @@ class BaseCrossVal(ABC):
             full_score=full_score,
             cv_score=cv_score,
             diff_score=diff_score,
+            diff_heat_score=diff_heat_score,
             diff_score_neg=diff_score_neg,
             full_alpha=full_alpha,
             cv_alpha=cv_alpha,
@@ -674,7 +695,7 @@ class BaseCrossVal(ABC):
         p2_render.nonselection_glyph.line_color = "white"
 
         # Heatmap Diff
-        p3 = figure(title=diff_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys_axis[0], y_axis_label=param_keys_axis[1])
+        p3 = figure(title=diff_heat_title, tools="tap, save", x_range=key0_unique, y_range=key1_unique, x_axis_label=param_keys_axis[0], y_axis_label=param_keys_axis[1])
 
         p3_render = p3.rect("key1_value", "key0_value", 0.9, 0.9, color="green", alpha="diff_alpha", line_color=None, source=source)
 
@@ -736,9 +757,9 @@ class BaseCrossVal(ABC):
             p2.add_layout(label2)
             p3.add_layout(label3)
 
-        p1.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[("AUC_full", "@full_text")]))
-        p2.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[("AUC_CV", "@cv_text")]))
-        p3.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[("AUC_diff", "@diff_text")]))
+        p1.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[(full_title, "@full_text")]))
+        p2.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[(cv_title, "@cv_text")]))
+        p3.add_tools(HoverTool(renderers=[p1_render, p2_render, p3_render], tooltips=[(diff_title, "@diff_text")]))
 
         sc_title = diff_title + " vs. " + cv_title
         # Scatterplot
@@ -751,7 +772,7 @@ class BaseCrossVal(ABC):
         p4_render.nonselection_glyph.fill_color = "green"
         p4_render.nonselection_glyph.fill_alpha = 0.4
         p4_render.nonselection_glyph.line_color = "white"
-        p4.add_tools(HoverTool(renderers=[p4_render], tooltips=[("AUC_full", "@full_text"), ("AUC_CV", "@cv_text"), ("AUC_diff", "@diff_text")]))
+        p4.add_tools(HoverTool(renderers=[p4_render], tooltips=[(full_title, "@full_text"), (cv_title, "@cv_text"), (diff_title, "@diff_text")]))
 
         p4.plot_width = int(320 * scale)
         p4.plot_height = int(257 * scale)
@@ -830,9 +851,9 @@ class BaseCrossVal(ABC):
 
         # p5_render_5.selection_glyph.text_alpha = 0.6
 
-        p5.add_tools(HoverTool(renderers=[p5_render_2], tooltips=[("AUC_full", "@full_text")]))
+        p5.add_tools(HoverTool(renderers=[p5_render_2], tooltips=[(full_title, "@full_text")]))
 
-        p5.add_tools(HoverTool(renderers=[p5_render_4], tooltips=[("AUC_CV", "@cv_text")]))
+        p5.add_tools(HoverTool(renderers=[p5_render_4], tooltips=[(cv_title, "@cv_text")]))
 
         p5.add_tools(TapTool(renderers=[p5_render_2, p5_render_4]))
 
