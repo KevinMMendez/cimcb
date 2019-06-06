@@ -15,6 +15,9 @@ class SVM(BaseModel):
         self.model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, probability=True, tol=tol, max_iter=max_iter)
         self.k = None
 
+        self.__name__ = 'cimcb.model.SVM'
+        self.__params__ = {'C': C, 'kernel': kernel, 'degree': degree, 'gamma': gamma, 'tol': tol, 'max_iter': max_iter}
+
     def set_params(self, params):
         self.__init__(**params)
 

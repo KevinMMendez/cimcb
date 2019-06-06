@@ -328,7 +328,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left", n_cores=-1):
+    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters
@@ -358,11 +358,14 @@ class BaseModel(ABC):
             metric = "cutoffscore"
             val = cutoffscore
         else:
-            metric = "specificity"
-            val = 0.8
+            metric = "cutoffscore"
+            val = 0.5
+
+        if errorbar is True:
+            errorbar = True
 
         # ROC plot
-        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric, n_cores=n_cores)
+        fpr_ib, tpr_ib_ci, stat_ib, median_ib, fpr_oob, tpr_oob_ci, stat_oob, median_oob, stats, median_y_ib, median_y_oob, manw_pval = roc_calculate_boot(self, X, Ytrue_train, Yscore_train, bootnum=bootnum, metric=metric, val=val, parametric=self.parametric)
 
         self.fpr_oob = np.insert(fpr_ib[0], 0, 0)
         self.tpr_oob = tpr_oob_ci[0]
@@ -421,7 +424,10 @@ class BaseModel(ABC):
         Ytrue_combined_name[Ytrue_combined == 3] = "OOB (1)"
 
         # Violin plot
-        violin_title = "Cut-off: {}".format(np.round(stats["val_cutoffscore"], 2))
+        if errorbar is False:
+            violin_title = ""
+        else:
+            violin_title = "Cut-off: {}".format(np.round(stats["val_cutoffscore"], 2))
         violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Median Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["IB (0)", "OOB (0)", "IB (1)", "OOB (1)"], group_name_sort=["IB (0)", "IB (1)", "OOB (0)", "OOB (1)"], title=violin_title, font_size="11pt", label_font_size="10pt")
         if errorbar is True:
             violin_bokeh.multi_line([[-100, 100]], [[stats["val_cutoffscore"], stats["val_cutoffscore"]]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
@@ -459,7 +465,7 @@ class BaseModel(ABC):
             stats_round_oob[i] = np.round(stat_oob[i], 2)
 
         # Create table
-        if errorbar is False:
+        if errorbar is 10:
             tabledata = dict(
                 evaluate=[["In Bag"]],
                 manw_pval=[["{}".format(manw_ib_pval_round)]],

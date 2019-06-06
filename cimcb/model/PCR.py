@@ -36,6 +36,9 @@ class PCR(BaseModel):
         self.regrmodel = LinearRegression()
         self.k = n_components
 
+        self.__name__ = 'cimcb.model.PCR'
+        self.__params__ = {'n_components': n_components}
+
     def set_params(self, params):
         self.__init__(**params)
 

@@ -24,6 +24,9 @@ class NN_LinearTan(BaseModel):
         self.loss = loss
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
 
+        self.__name__ = 'cimcb.model.NN_LinearTan'
+        self.__params__ = {'n_neurons': n_neurons, 'epochs': epochs, 'learning_rate': learning_rate, 'momentum': momentum, 'decay': decay, 'nesterov': nesterov, 'loss': loss, 'batch_size': batch_size, 'verbose': verbose}
+
     def set_params(self, params):
         self.__init__(**params)
 

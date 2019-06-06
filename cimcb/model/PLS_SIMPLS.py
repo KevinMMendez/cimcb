@@ -42,6 +42,9 @@ class PLS_SIMPLS(BaseModel):
         self.n_component = n_components
         self.k = n_components
 
+        self.__name__ = 'cimcb.model.PLS_SIMPLS'
+        self.__params__ = {'n_components': n_components}
+
     def set_params(self, params):
         self.__init__(**params)
 

@@ -15,6 +15,9 @@ class RF(BaseModel):
         self.model = RandomForestClassifier(n_estimators=n_estimators, max_features=max_features, max_depth=max_depth, criterion=criterion, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_leaf_nodes=max_leaf_nodes, n_jobs=n_jobs)
         self.k = n_estimators
 
+        self.__name__ = 'cimcb.model.RF'
+        self.__params__ = {'n_estimators': n_estimators, 'max_features': max_features, 'max_depth': max_depth, 'criterion': criterion, 'min_samples_split': min_samples_split, 'min_samples_leaf': min_samples_leaf, 'max_leaf_nodes': max_leaf_nodes, 'n_jobs': n_jobs}
+
     def set_params(self, params):
         self.__init__(**params)
 

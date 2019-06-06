@@ -16,6 +16,9 @@ class RBF_NN(BaseModel):
         self.max_iter = max_iter
         self.k = n_clusters
 
+        self.__name__ = 'cimcb.model.RBF_NN'
+        self.__params__ = {'n_clusters': n_clusters, 'max_iter': max_iter}
+
     def set_params(self, params):
         self.__init__(**params)
 

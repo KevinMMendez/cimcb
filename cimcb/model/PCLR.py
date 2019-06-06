@@ -36,6 +36,9 @@ class PCLR(BaseModel):
         self.regrmodel = LogisticRegression(solver="liblinear")
         self.k = n_components
 
+        self.__name__ = 'cimcb.model.PCLR'
+        self.__params__ = {'n_components': n_components}
+
     def set_params(self, params):
         self.__init__(**params)
 
