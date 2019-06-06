@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setup(
     name="cimcb",
-    version="1.0.22",
+    version="1.0.23",
     description="This is a pre-release.",
     long_description=long_description,
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
