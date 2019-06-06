@@ -14,6 +14,7 @@ from sklearn import metrics
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.utils import resample
 from ..utils import binary_metrics, dict_median
+import cimcb.model
 
 
 def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", title="", errorbar=False):
@@ -355,7 +356,8 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
     start = timeit.default_timer()
 
     # model copy
-    model_boot = copy(model)
+    model_name = model.__name__
+    model_boot = eval(model_name)
 
     # Get fpr, tpr
     fpr, tpr, threshold = metrics.roc_curve(Ytrue, Yscore, pos_label=1, drop_intermediate=False)
@@ -389,7 +391,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
 
     # input for parallel
     class para_class:
-        def __init__(self, x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc):
+        def __init__(self, x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc, params):
             self.x0_idx = x0_idx
             self.x1_idx = x1_idx
             self.model_boot = model_boot
@@ -402,22 +404,17 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
             self.n_cores = n_cores
             self.x0_loc = x0_loc
             self.x1_loc = x1_loc
+            self.params = params
 
         def _roc_calculate_boot_loop(self, i):
             val = _roc_calculate_boot_loop(self)
             return val
 
-    self = para_class(x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc)
+    params = model.__params__
 
-    try:
-        para_output = Parallel(n_jobs=self.n_cores)(delayed(self._roc_calculate_boot_loop)(i) for i in tqdm(range(bootnum)))
-    except:
-        print("There was an error while using parallel, so this will now revert back to NOT using parallel processing. If this is with ANNs, I'm currently trying to fix this.")
-        time.sleep(0.5)
-        para_output = []
-        for i in tqdm(range(bootnum)):
-            para_temp = self._roc_calculate_boot_loop(i)
-            para_output.append(para_temp)
+    self = para_class(x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc, params)
+
+    para_output = Parallel(n_jobs=self.n_cores)(delayed(self._roc_calculate_boot_loop)(i) for i in tqdm(range(bootnum)))
 
     tpr_ib = []
     fpr_ib = []
@@ -532,7 +529,8 @@ def _roc_calculate_boot_loop(self):
 
     x0_idx = self.x0_idx
     x1_idx = self.x1_idx
-    model_boot = self.model_boot
+    params = self.params
+    model_boot = self.model_boot(**params)
     x0 = self.x0
     x1 = self.x1
     metric = self.metric
