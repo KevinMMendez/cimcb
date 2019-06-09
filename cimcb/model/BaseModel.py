@@ -151,7 +151,7 @@ class BaseModel(ABC):
         output_notebook()
         show(fig)
 
-    def evaluate(self, testset=None, plot_median=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def evaluate(self, testset=None, plot_median=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
         Parameters
@@ -233,6 +233,9 @@ class BaseModel(ABC):
             Ytrue_combined_name[Ytrue_combined == 3] = "Test (1)"
 
         # Violin plot
+        self.score = Yscore_train
+        self.true = Ytrue_train
+
         violin_title = "Cut-off: {}".format(np.round(stats["val_cutoffscore"], 2))
         if testset is None:
             violin_bokeh = boxplot(Yscore_train, Ytrue_train, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315, title=violin_title, font_size="11pt")
@@ -242,9 +245,9 @@ class BaseModel(ABC):
 
         # Distribution plot
         if testset is None:
-            dist_bokeh = distribution(Yscore_train, group=Ytrue_train, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+            dist_bokeh = distribution(Yscore_train, group=Ytrue_train, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, smooth=dist_smooth)
         else:
-            dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+            dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, smooth=dist_smooth)
         dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
         # Man-Whitney U for Table (round and use scienitic notation if p-value > 0.001)
@@ -328,7 +331,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left"):
+    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters
@@ -433,9 +436,9 @@ class BaseModel(ABC):
             violin_bokeh.multi_line([[-100, 100]], [[stats["val_cutoffscore"], stats["val_cutoffscore"]]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
         # Distribution plot
-        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt")
+        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt", smooth=dist_smooth)
         if errorbar is True:
-            dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
+            dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed", smooth=dist_smooth)
 
         # Manu
         manw_ib = []
