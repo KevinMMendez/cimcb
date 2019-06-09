@@ -39,6 +39,9 @@ class holdout(BaseCrossVal):
 
         super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores, ci=ci)
 
+        if folds is not None:
+            print("You are using holdout not kfold, so folds has no effect.")
+
         # Save holdout specific inputs
         self.test_size = test_size
         if stratify is True:
