@@ -389,8 +389,8 @@ class BaseCrossVal(ABC):
         y_axis_text = full_title[:-4]
 
         if metric is "r2q2":
-            full_title = 'R2'
-            cv_title = 'Q2'
+            full_title = 'R²'
+            cv_title = 'Q²'
             diff_title = "| R² - Q² |"
             if diff1_heat == False:
                 diff_heat_title = diff_title
@@ -407,8 +407,8 @@ class BaseCrossVal(ABC):
             full_title = full_title[:-4] + "train"
             cv_title = full_title[:-5] + "test"
             if metric is "r2q2":
-                full_title = 'R2'
-                cv_title = 'Q2'
+                full_title = 'R²'
+                cv_title = 'Q²'
 
         # round full, cv, and diff for hovertool
         full_hover = []
