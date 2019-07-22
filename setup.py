@@ -1,13 +1,16 @@
 from setuptools import setup
 
-with open("README.md", "r") as f:
-    long_description = f.read()
 
+def readme():
+    with open('README.md', encoding='utf-8') as f:
+        return f.read()
+  
 setup(
     name="cimcb",
-    version="1.0.26",
+    version="1.0.27",
     description="This is a pre-release.",
-    long_description=long_description,
+    long_description=readme(),
+    long_description_content_type='text/markdown',
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
     url="https://github.com/KevinMMendez/cimcb",
     packages=["cimcb", "cimcb.bootstrap", "cimcb.cross_val", "cimcb.model", "cimcb.plot", "cimcb.utils"],
