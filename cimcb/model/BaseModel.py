@@ -151,7 +151,7 @@ class BaseModel(ABC):
         output_notebook()
         show(fig)
 
-    def evaluate(self, testset=None, plot_median=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
+    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
         Parameters
@@ -331,7 +331,7 @@ class BaseModel(ABC):
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
 
-    def booteval(self, X, Y, errorbar=True, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
+    def booteval(self, X, Y, errorbar=False, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
             Parameters

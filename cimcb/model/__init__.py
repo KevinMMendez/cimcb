@@ -23,10 +23,11 @@ from .NN_ReluLinear import NN_ReluLinear
 from .NN_ReluLogit import NN_ReluLogit
 from .NN_ReluTan import NN_ReluTan
 from .NN_ReluRelu import NN_ReluRelu
+from .RBF_NN import RBF_NN
 
 
 __all__ = ["NN_LinearLogit_Sklearn", "NN_LogitLogit_Sklearn", "PCLR", "PCR", "PLS_SIMPLS", "RF", "SVM", "NN_L1", "NN_L2",
            "NN_LinearLinear", "NN_LinearLogit", "NN_LinearTan", "NN_LinearRelu", " NN_LogitLinear", "NN_LogitLogit",
            "NN_LogitTan", "NN_LogitRelu",
            "NN_TanLinear", "NN_TanLogit", "NN_TanTan", "NN_TanRelu",
-           "NN_ReluLinear", "NN_ReluLogit", "NN_ReluTan", "NN_ReluRelu"]
+           "NN_ReluLinear", "NN_ReluLogit", "NN_ReluTan", "NN_ReluRelu", "RBF_NN"]
