@@ -26,8 +26,9 @@ def table_check(DataTable, PeakTable, print_statement=True):
     if len(np.unique(DataTable.Idx)) != len(DataTable.Idx):
         raise ValueError("Data Table Idx numbers are not unique. Please change")
 
-    if "Class" not in data_columns:
-        raise ValueError("Data Table does not contain the required 'Class' column")
+    # Removed 'Class' as a required column
+    # if "Class" not in data_columns:
+    #     raise ValueError("Data Table does not contain the required 'Class' column")
 
     if "SampleID" not in data_columns:
         raise ValueError("Data Table does not contain the required 'SampleID' column")
