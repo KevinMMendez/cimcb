@@ -14,7 +14,7 @@ def load_dataXL(filename, DataSheet, PeakSheet):
         The name of the excel file (.xlsx file) e.g. 'projectxxx1.xlsx'.  Note, it can include the directory e.g. '/homedir/projectxxx1.xlsx'
 
     DataSheet : string
-        The name of the data sheet in the file e.g. 'Data'. Note, the data sheet must contain an 'Idx', 'SampleID', and 'Class' column.
+        The name of the data sheet in the file e.g. 'Data'. Note, the data sheet must contain an 'Idx' and 'SampleID' column.
 
     PeakSheet : string
         The name of the peak sheet in the file e.g. 'Pata'. Note, the peak sheet must contain an 'Idx', 'Name', and 'Label' column.
