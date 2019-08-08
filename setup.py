@@ -7,7 +7,7 @@ def readme():
   
 setup(
     name="cimcb",
-    version="1.0.28",
+    version="1.0.29",
     description="This is a pre-release.",
     long_description=readme(),
     long_description_content_type='text/markdown',
