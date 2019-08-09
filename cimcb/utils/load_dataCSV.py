@@ -4,7 +4,7 @@ from os import path
 from .table_check import table_check
 
 
-def load_dataXL(DataSheet, PeakSheet):
+def load_dataCSV(DataSheet, PeakSheet):
     """Loads and validates the DataFile and PeakFile from csv files.
 
 
