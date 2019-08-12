@@ -375,6 +375,13 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
         stats["val_sensitivity"] = specificity
         stats["val_cutoffscore"] = threshold
 
+    # Check if multiple multiblock
+    if len(Xtrue) == 2:
+        mb_split = len(Xtrue[0].T)
+        Xtrue = np.concatenate((Xtrue[0], Xtrue[1]), axis=1)
+    else:
+        mb_split = 0
+
     # bootstrap using vertical averaging to linspace
     mean_fpr = np.linspace(0, 1, 1000)
     # understand location
@@ -391,7 +398,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
 
     # input for parallel
     class para_class:
-        def __init__(self, x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc, params):
+        def __init__(self, x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc, params, mb_split):
             self.x0_idx = x0_idx
             self.x1_idx = x1_idx
             self.model_boot = model_boot
@@ -405,6 +412,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
             self.x0_loc = x0_loc
             self.x1_loc = x1_loc
             self.params = params
+            self.mb_split = mb_split
 
         def _roc_calculate_boot_loop(self, i):
             val = _roc_calculate_boot_loop(self)
@@ -412,7 +420,7 @@ def roc_calculate_boot(model, Xtrue, Ytrue, Yscore, bootnum=1000, metric=None, v
 
     params = model.__params__
 
-    self = para_class(x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc, params)
+    self = para_class(x0_idx, x1_idx, model_boot, x0, x1, metric, specificity, parametric, mean_fpr, n_cores, x0_loc, x1_loc, params, mb_split)
 
     para_output = Parallel(n_jobs=self.n_cores)(delayed(self._roc_calculate_boot_loop)(i) for i in tqdm(range(bootnum)))
 
@@ -539,6 +547,7 @@ def _roc_calculate_boot_loop(self):
     mean_fpr = self.mean_fpr
     x0_loc = self.x0_loc
     x1_loc = self.x1_loc
+    mb_split = self.mb_split
 
     # resample
     x0_idx_ib = resample(x0_idx)
@@ -559,6 +568,16 @@ def _roc_calculate_boot_loop(self):
     y1_oob = np.ones(len(x1_idx_oob))
     y_ib = np.concatenate((y0_ib, y1_ib))
     y_oob = np.concatenate((y0_oob, y1_oob))
+
+    # Check if multiblock
+    if self.mb_split > 0:
+        x_ib_0 = x_ib[:, :mb_split]
+        x_ib_1 = x_ib[:, mb_split:]
+        x_ib = [x_ib_0, x_ib_1]
+        x_oob_0 = x_oob[:, :mb_split]
+        x_oob_1 = x_oob[:, mb_split:]
+        x_oob = [x_oob_0, x_oob_1]
+
     # train and test model
     ypred_ib = model_boot.train(x_ib, y_ib)
     ypred_oob = model_boot.test(x_oob)
@@ -587,7 +606,7 @@ def _roc_calculate_boot_loop(self):
     fpro, tpro, _ = metrics.roc_curve(y_oob, ypred_oob, pos_label=1, drop_intermediate=False)
     k_fpr_oob = mean_fpr
     k_tpr_oob = interp(mean_fpr, fpro, tpro)
-    #k_tpr_oob[-1][0] = 0.0
+    # k_tpr_oob[-1][0] = 0.0
 
     # if metric is provided, calculate stats
     if metric is not None:
