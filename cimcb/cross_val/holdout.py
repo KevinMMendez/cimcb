@@ -114,7 +114,13 @@ class holdout(BaseCrossVal):
     def _calc_ypred_loop(self, i):
         """Core component of calc_ypred."""
         # Set x and y
-        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=self.test_size, stratify=self.stratify)
+        if len(self.X) == len(self.Y):
+            X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=self.test_size, stratify=self.stratify)
+        else:
+            X0_train, X0_test, X1_train, X1_test, Y_train, Y_test = train_test_split(self.X[0], self.X[1], self.Y, test_size=self.test_size, stratify=self.stratify)
+            X_train = [X0_train, X1_train]
+            X_test = [X0_test, X1_test]
+
         # Set hyper - parameters
         params_i = self.loop_mc[i]
         model_i = self.model()
@@ -132,7 +138,12 @@ class holdout(BaseCrossVal):
         # Set inputs
         Y_full = []
         Y_cv = []
-        X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=self.test_size, stratify=self.stratify)
+        if len(self.X) == len(self.Y):
+            X_train, X_test, Y_train, Y_test = train_test_split(self.X, self.Y, test_size=self.test_size, stratify=self.stratify)
+        else:
+            X0_train, X0_test, X1_train, X1_test, Y_train, Y_test = train_test_split(self.X[0], self.X[1], self.Y, test_size=self.test_size, stratify=self.stratify)
+            X_train = [X0_train, X1_train]
+            X_test = [X0_test, X1_test]
         # Set hyper - parameters
         params_i = self.loop_mc[i]
         model_i = self.model()

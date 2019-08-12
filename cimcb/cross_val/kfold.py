@@ -138,17 +138,35 @@ class kfold(BaseCrossVal):
             actual_epoch = epoch_list[i]
             ypred_full.append(ypred_full_i[actual_epoch])
         # CV
-        fold_split = []
-        for train, test in self.crossval_idx.split(self.X, self.Y):
-            fold_split.append((train, test))
+        if len(self.X) == len(self.Y):
+            fold_split = []
+            for train, test in self.crossval_idx.split(self.X, self.Y):
+                fold_split.append((train, test))
+        else:
+            fold_split = []
+            for train, test in self.crossval_idx.split(self.X[0], self.Y):
+                fold_split.append((train, test))
         # Split into train and test
         ypred_cv_i = np.zeros((len(self.Y), len(epoch_list)))
         for i in range(len(fold_split)):
             train, test = fold_split[i]
-            X_train = self.X[train, :]
-            Y_train = self.Y[train]
-            X_test = self.X[test, :]
-            Y_test = self.Y[test]
+            if len(self.X) == len(self.Y):
+                X_train = self.X[train, :]
+                Y_train = self.Y[train]
+                X_test = self.X[test, :]
+                Y_test = self.Y[test]
+            else:
+                # Multiblock
+                X0 = self.X[0]
+                X1 = self.X[1]
+                Y = self.Y
+                X0_train = X0[train, :]
+                X1_train = X1[train, :]
+                X_train = [X0_train, X1_train]
+                Y_train = Y[train]
+                X0_test = X0[test, :]
+                X1_test = X1[test, :]
+                X_test = [X0_test, X1_test]
             # Full
             model_i.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
             ypred_cv_i_j = model_i.epoch.Y_test
