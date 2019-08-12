@@ -9,7 +9,7 @@ from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
 
-class MBNN_LinearSigmoid(BaseModel):
+class MBNN_LinearSigmoid_1Layer(BaseModel):
     """2 Layer logistic-logistic neural network using Keras"""
 
     parametric = True
