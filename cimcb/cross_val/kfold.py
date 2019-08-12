@@ -216,15 +216,34 @@ class kfold(BaseCrossVal):
     def _calc_cv_ypred(self, model_i, X, Y):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
-        for train, test in self.crossval_idx.split(self.X, self.Y):
-            X_train = X[train, :]
-            Y_train = Y[train]
-            X_test = X[test, :]
-            model_i.train(X_train, Y_train)
-            ypred_cv_i_j = model_i.test(X_test)
-            # Return value to y_pred_cv in the correct position # Better way to do this
-            for (idx, val) in zip(test, ypred_cv_i_j):
-                ypred_cv_i[idx] = val.tolist()
+        if len(X) == len(Y):
+            for train, test in self.crossval_idx.split(self.X, self.Y):
+                X_train = X[train, :]
+                Y_train = Y[train]
+                X_test = X[test, :]
+                model_i.train(X_train, Y_train)
+                ypred_cv_i_j = model_i.test(X_test)
+                # Return value to y_pred_cv in the correct position # Better way to do this
+                for (idx, val) in zip(test, ypred_cv_i_j):
+                    ypred_cv_i[idx] = val.tolist()
+        else:
+            # Multiblock study
+            X0 = self.X[0]
+            X1 = self.X[1]
+            for train, test in self.crossval_idx.split(X0, self.Y):
+                X0_train = X0[train, :]
+                X1_train = X1[train, :]
+                X_train = [X0_train, X1_train]
+                Y_train = Y[train]
+                X0_test = X0[test, :]
+                X1_test = X1[test, :]
+                X_test = [X0_test, X1_test]
+                model_i.train(X_train, Y_train)
+                ypred_cv_i_j = model_i.test(X_test)
+                # Return value to y_pred_cv in the correct position # Better way to do this
+                for (idx, val) in zip(test, ypred_cv_i_j):
+                    ypred_cv_i[idx] = val.tolist()
+
         return ypred_cv_i
 
     def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True):
