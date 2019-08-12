@@ -349,7 +349,7 @@ class BaseModel(ABC):
                 The number of bootstrap samples used in the computation.
             """
         model_boot = copy(self)
-        X, Y = self.input_check(X, Y)
+        #X, Y = self.input_check(X, Y)
         Ytrue_train = Y
         Yscore_train = model_boot.train(X, Y).flatten()
 
