@@ -157,10 +157,22 @@ class NN_LinearSigmoid(BaseModel):
         layer2_weight = self.model.layers[1].get_weights()[0]
         layer2_bias = self.model.layers[1].get_weights()[1]
 
-        self.model.y_loadings_ = layer2_weight
-        self.model.y_loadings_ = self.model.y_loadings_.reshape(1, len(self.model.y_loadings_))
-        self.model.x_loadings_ = layer1_weight
-        self.model.x_scores_ = np.matmul(X, self.model.x_loadings_) + layer1_bias
+        self.model.x_scores_ = np.matmul(X, layer1_weight) + layer1_bias
+        self.model.x_scores_alt = logistic.cdf(self.model.x_scores_)
+        for i in range(len(layer2_weight)):
+            if layer2_weight[i] < 0:
+                self.model.x_scores_[:, i] = -self.model.x_scores_[:, i]
+                self.model.x_scores_alt[:, i] = -self.model.x_scores_alt[:, i]
+
+        order = np.argsort(self.model.pctvar_)[::-1]
+        x_scores_ = deepcopy(self.model.x_scores_)
+        x_scores_alt = deepcopy(self.model.x_scores_alt)
+        for i in range(len(order)):
+            self.model.x_scores_[:, i] = x_scores_[:, order[i]]
+            self.model.x_scores_alt[:, i] = x_scores_alt[:, order[i]]
+
+        self.model.x_scores_alt = self.model.x_scores_
+
         y_pred_test = self.model.predict(X).flatten()
-        self.model.pctvar_ = sum(abs(self.model.x_scores_) ** 2) / sum(sum(abs(X) ** 2)) * 100
+
         return y_pred_test

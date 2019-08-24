@@ -112,6 +112,8 @@ class PLS_SIMPLS(BaseModel):
         if isinstance(X, pd.DataFrame or pd.Series):
             X = np.array(X)
 
+        self.model.x_scores_ = np.dot(X, self.model.x_weights_)
+
         # Calculate and return Y predicted value
         newX = np.insert(X, 0, np.ones(len(X)), axis=1)
         y_pred_test = np.matmul(newX, self.model.beta_)
