@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 import scipy
 import collections
+import math
+from scipy.stats import logistic
+from itertools import combinations
 from copy import deepcopy, copy
 from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.models import HoverTool, Band
@@ -75,7 +78,8 @@ class BaseModel(ABC):
             boot = BC(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
         if type is "perc":
             boot = Perc(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-        self.bootci = boot.run()
+        self.boot = boot
+        self.bootci = self.boot.run()
 
     def plot_featureimportance(self, PeakTable, peaklist=None, ylabel="Label", sort=True):
         """Plots feature importance metrics.
@@ -107,14 +111,24 @@ class BaseModel(ABC):
             ci_coef = self.bootci["model.coef_"]
             ci_vip = self.bootci["model.vip_"]
 
+        if self.__name__ == 'cimcb.model.NN_SigmoidSigmoid':
+            name_coef = "Feature Importance: Connection Weight"
+            name_vip = "Feature Importance: Garlson's Algorithm"
+        elif self.__name__ == 'cimcb.model.NN_LinearSigmoid':
+            name_coef = "Feature Importance: Connection Weight"
+            name_vip = "Feature Importance: Garlson's Algorithm"
+        else:
+            name_coef = "Coefficient Plot"
+            name_vip = "Variable Importance in Projection (VIP)"
+
         # Remove rows from PeakTable if not in peaklist
         if peaklist is not None:
             PeakTable = PeakTable[PeakTable["Name"].isin(peaklist)]
         peaklabel = PeakTable[ylabel]
 
         # Plot
-        fig_1 = scatterCI(self.model.coef_, ci=ci_coef, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Coefficient Plot", sort_abs=sort)
-        fig_2 = scatterCI(self.model.vip_, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title="Variable Importance in Projection (VIP)", sort_abs=sort)
+        fig_1 = scatterCI(self.model.coef_, ci=ci_coef, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title=name_coef, sort_abs=sort)
+        fig_2 = scatterCI(self.model.vip_, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title=name_vip, sort_abs=sort)
         fig = layout([[fig_1], [fig_2]])
         output_notebook()
         show(fig)
@@ -138,6 +152,83 @@ class BaseModel(ABC):
             Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
             Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
         return Peaksheet
+
+    def plot_loadings(self, PeakTable, peaklist=None, ylabel="Label", sort=False):
+        """Plots feature importance metrics.
+
+        Parameters
+        ----------
+        PeakTable : DataFrame
+            Peak sheet with the required columns.
+
+        peaklist : list or None, (default None)
+            Peaks to include in plot (the default is to include all samples).
+
+        ylabel : string, (default "Label")
+            Name of column in PeakTable to use as the ylabel.
+
+        sort : boolean, (default True)
+            Whether to sort plots in absolute descending order.
+
+        Returns
+        -------
+        Peaksheet : DataFrame
+            New PeakTable with added "Coef" and "VIP" columns (+ "Coef-95CI" and  "VIP-95CI" if calc_bootci is used prior to plot_featureimportance).
+        """
+        n_loadings = len(self.model.x_loadings_[0])
+        if not hasattr(self, "bootci"):
+            print("Use method calc_bootci prior to plot_loadings to add 95% confidence intervals to plots.")
+            ci_loadings = None
+        else:
+            ci_loadings = self.bootci["model.x_loadings_"]
+
+        # Remove rows from PeakTable if not in peaklist
+        if peaklist is not None:
+            PeakTable = PeakTable[PeakTable["Name"].isin(peaklist)]
+        peaklabel = PeakTable[ylabel]
+
+        a = [None] * 2
+
+        # Plot
+        plots = []
+        for i in range(n_loadings):
+            if ci_loadings is None:
+                cii = None
+            else:
+                cii = ci_loadings[i]
+            fig = scatterCI(self.model.x_loadings_[:, i],
+                            ci=cii,
+                            label=peaklabel,
+                            hoverlabel=PeakTable[["Idx", "Name", "Label"]],
+                            hline=0,
+                            col_hline=True,
+                            title="Loadings Plot: LV{}".format(i + 1),
+                            sort_abs=sort)
+            plots.append([fig])
+
+        fig = layout(plots)
+        output_notebook()
+        show(fig)
+
+        # Return table with: Idx, Name, Label, Coefficient, 95CI, VIP, 95CI
+        if not hasattr(self, "bootci"):
+            returnlist = []
+            for i in range(n_loadings):
+                df = pd.DataFrame([self.model.x_loadings_[:, i]]).T
+                df.rename(columns={0: "LV {}".format(i + 1)}, inplace=True)
+        # else:
+        #     coef = pd.DataFrame([self.model.coef_, self.bootci["model.coef_"]]).T
+        #     coef.rename(columns={0: "Coef", 1: "Coef-95CI"}, inplace=True)
+        #     vip = pd.DataFrame([self.model.vip_, self.bootci["model.vip_"]]).T
+        #     vip.rename(columns={0: "VIP", 1: "VIP-95CI"}, inplace=True)
+
+        # Peaksheet = PeakTable.copy()
+        # Peaksheet["Coef"] = coef["Coef"].values
+        # Peaksheet["VIP"] = vip["VIP"].values
+        # if hasattr(self, "bootci"):
+        #     Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
+        #     Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
+        # return Peaksheet
 
     def permutation_test(self, nperm=100):
         """Plots permutation test figures.
@@ -539,6 +630,194 @@ class BaseModel(ABC):
         fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [table_bokeh]])
         output_notebook()
         show(column(Div(text=title_bokeh, width=900, height=50), fig))
+
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=True, weight_alt=False):
+        """ Plots latent variables projections against each other in a Grid format.
+
+        Parameters
+        ----------
+        label : DataFrame or None, (default None)
+            hovertool for scatterplot.
+
+        size : positive integer, (default 12)
+            size specifies circle size for scatterplot.
+        """
+
+        if not hasattr(self, "bootci"):
+            print("Use method calc_bootci prior to plot_projections.")
+            bootx = None
+        else:
+            bootx = 1
+
+        x_scores_true = deepcopy(self.model.x_scores_)
+        if weight_alt is True:
+            self.model.x_scores_ = self.model.x_scores_alt
+
+        num_x_scores = len(self.model.x_scores_.T)
+
+        # If there is only 1 x_score, Need to plot x_score vs. peak (as opposided to x_score[i] vs. x_score[j])
+        if num_x_scores == 1:
+            # Violin plot
+            violin_bokeh = boxplot(self.Y_pred.flatten(), self.Y, title="", xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315)
+            # Distribution plot
+            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+            # ROC plot
+            fpr, tpr, tpr_ci = roc_calculate(self.Y, self.Y_pred, bootnum=100)
+            roc_bokeh = roc_plot(fpr, tpr, tpr_ci, width=310, height=315)
+            # Score plot
+            y = self.model.x_scores_[:, 0].tolist()
+            # get label['Idx'] if it exists
+            try:
+                x = label["Idx"].values.ravel()
+            except:
+                x = []
+                for i in range(len(y)):
+                    x.append(i)
+            scatter_bokeh = scatter(x, y, label=label, group=self.Y, ylabel="LV {} ({:0.1f}%)".format(1, self.model.pctvar_[0]), xlabel="Idx", legend=True, title="", width=950, height=315, hline=0, size=int(size / 2), hover_xy=False)
+
+            # Combine into one figure
+            fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh], [scatter_bokeh]])
+
+        else:
+            if bootx is None:
+                comb_x_scores = list(combinations(range(num_x_scores), 2))
+
+                # Width/height of each scoreplot
+                width_height = int(950 / num_x_scores)
+                circle_size_scoreplot = size / num_x_scores
+                label_font = str(13 - num_x_scores) + "pt"
+
+                # Create empty grid
+                grid = np.full((num_x_scores, num_x_scores), None)
+
+                # Append each scoreplot
+                for i in range(len(comb_x_scores)):
+                    # Make a copy (as it overwrites the input label/group)
+                    label_copy = deepcopy(label)
+                    group_copy = self.Y.copy()
+
+                    # Scatterplot
+                    x, y = comb_x_scores[i]
+                    xlabel = "LV {} ({:0.1f}%)".format(x + 1, self.model.pctvar_[x])
+                    ylabel = "LV {} ({:0.1f}%)".format(y + 1, self.model.pctvar_[y])
+                    gradient = self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x]
+
+                    max_range = max(np.max(np.abs(self.model.x_scores_[:, x])), np.max(np.abs(self.model.x_scores_[:, y])))
+                    new_range_min = -max_range - 0.05 * max_range
+                    new_range_max = max_range + 0.05 * max_range
+                    new_range = (new_range_min, new_range_max)
+
+                    grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=ci95, scatterplot=scatterplot)
+
+                # Append each distribution curve
+                for i in range(num_x_scores):
+                    xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
+                    grid[i, i] = distribution(self.model.x_scores_[:, i], group=group_copy, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+
+                # Append each roc curve
+                for i in range(len(comb_x_scores)):
+                    x, y = comb_x_scores[i]
+
+                    # Get the optimal combination of x_scores based on rotation of y_loadings_
+                    theta = math.atan(self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x])
+                    x_rotate = self.model.x_scores_[:, x] * math.cos(theta) + self.model.x_scores_[:, y] * math.sin(theta)
+
+                    # ROC Plot with x_rotate
+                    fpr, tpr, tpr_ci = roc_calculate(np.abs(1 - self.Y), x_rotate, bootnum=100)
+                    #print('k- inv')
+
+                    if metrics.auc(fpr, tpr) < 0.5:
+                        fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
+                    grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font)
+
+            else:
+
+                if weight_alt is False:
+                    a = 'model.x_scores_'
+                else:
+                    a = 'model.x_scores_alt'
+
+                x_scores_boot = {}
+                for i in range(len(self.boot.bootstat[a])):
+                    # This is the scores for each bootstrap
+                    # Do some checks and switches ect... then append
+                    for j in range(len(self.boot.bootidx[i])):
+                        try:
+                            x_scores_boot[self.boot.bootidx[i][j]].append(self.boot.bootstat[a][i][j])
+                        except KeyError:
+                            x_scores_boot[self.boot.bootidx[i][j]] = [self.boot.bootstat[a][i][j]]
+
+                boot_xscores = []
+                for i in range(len(self.Y)):
+                    try:
+                        scoresi = x_scores_boot[i]
+                    except KeyError:
+                        raise ValueError("Kevin needs to fix this. For now, increase the number of bootstraps.")
+                    scoresi = np.array(scoresi)
+                    scoresmed = np.median(np.array(scoresi), axis=0)
+                    boot_xscores.append(scoresmed)
+
+                boot_xscores = np.array(boot_xscores)
+
+                self.a = boot_xscores
+
+                comb_x_scores = list(combinations(range(num_x_scores), 2))
+
+                # Width/height of each scoreplot
+                width_height = int(950 / num_x_scores)
+                circle_size_scoreplot = size / num_x_scores
+                label_font = str(13 - num_x_scores) + "pt"
+
+                # Create empty grid
+                grid = np.full((num_x_scores, num_x_scores), None)
+
+                # Append each scoreplot
+                for i in range(len(comb_x_scores)):
+                    # Make a copy (as it overwrites the input label/group)
+                    label_copy = deepcopy(label)
+                    group_copy = self.Y.copy()
+
+                    # Scatterplot
+                    x, y = comb_x_scores[i]
+                    xlabel = "LV {} ({:0.1f}%)".format(x + 1, self.model.pctvar_[x])
+                    ylabel = "LV {} ({:0.1f}%)".format(y + 1, self.model.pctvar_[y])
+                    gradient = self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x]
+
+                    max_range = max(np.max(np.abs(self.model.x_scores_[:, x])), np.max(np.abs(self.model.x_scores_[:, y])))
+                    new_range_min = -max_range - 0.05 * max_range
+                    new_range_max = max_range + 0.05 * max_range
+                    new_range = (new_range_min, new_range_max)
+
+                    grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=ci95, scatterplot=scatterplot, extraci95_x=boot_xscores[:, x].tolist(), extraci95_y=boot_xscores[:, y].tolist(), extraci95=True)
+
+                # Append each distribution curve
+                group_dist = np.concatenate((self.Y, (self.Y + 2)))
+
+                for i in range(num_x_scores):
+                    score_dist = np.concatenate((self.model.x_scores_[:, i], boot_xscores[:, i]))
+                    xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
+                    grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+
+                # Append each roc curve
+                for i in range(len(comb_x_scores)):
+                    x, y = comb_x_scores[i]
+
+                    # Get the optimal combination of x_scores based on rotation of y_loadings_
+                    theta = math.atan(self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x])
+                    x_rotate = self.model.x_scores_[:, x] * math.cos(theta) + self.model.x_scores_[:, y] * math.sin(theta)
+                    x_rotate_boot = boot_xscores[:, x] * math.cos(theta) + boot_xscores[:, y] * math.sin(theta)
+
+                    # ROC Plot with x_rotate
+                    fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
+                    fpr_boot, tpr_boot, tpr_ci_boot = roc_calculate(group_copy, x_rotate_boot, bootnum=100)
+
+                    grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
+            # Bokeh grid
+            fig = gridplot(grid.tolist())
+
+        self.model.x_scores_ = x_scores_true
+        output_notebook()
+        show(fig)
 
     def save_table(self, name="table.xlsx"):
         try:

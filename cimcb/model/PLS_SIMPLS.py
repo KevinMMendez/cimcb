@@ -35,7 +35,7 @@ class PLS_SIMPLS(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2):
         self.model = PLSRegression()  # Should change this to an empty model
@@ -116,96 +116,6 @@ class PLS_SIMPLS(BaseModel):
         newX = np.insert(X, 0, np.ones(len(X)), axis=1)
         y_pred_test = np.matmul(newX, self.model.beta_)
         return y_pred_test
-
-    def plot_projections(self, label=None, size=12):
-        """ Plots latent variables projections against each other in a Grid format.
-
-        Parameters
-        ----------
-        label : DataFrame or None, (default None)
-            hovertool for scatterplot.
-
-        size : positive integer, (default 12)
-            size specifies circle size for scatterplot.
-        """
-
-        num_x_scores = len(self.model.x_scores_.T)
-
-        # If there is only 1 x_score, Need to plot x_score vs. peak (as opposided to x_score[i] vs. x_score[j])
-        if num_x_scores == 1:
-            # Violin plot
-            violin_bokeh = boxplot(self.Y_pred.flatten(), self.Y, title="", xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315)
-            # Distribution plot
-            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
-            # ROC plot
-            fpr, tpr, tpr_ci = roc_calculate(self.Y, self.Y_pred, bootnum=100)
-            roc_bokeh = roc_plot(fpr, tpr, tpr_ci, width=310, height=315)
-            # Score plot
-            y = self.model.x_scores_[:, 0].tolist()
-            # get label['Idx'] if it exists
-            try:
-                x = label["Idx"].values.ravel()
-            except:
-                x = []
-                for i in range(len(y)):
-                    x.append(i)
-            scatter_bokeh = scatter(x, y, label=label, group=self.Y, ylabel="LV {} ({:0.1f}%)".format(1, self.model.pctvar_[0]), xlabel="Idx", legend=True, title="", width=950, height=315, hline=0, size=int(size / 2), hover_xy=False)
-
-            # Combine into one figure
-            fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh], [scatter_bokeh]])
-
-        else:
-            comb_x_scores = list(combinations(range(num_x_scores), 2))
-
-            # Width/height of each scoreplot
-            width_height = int(950 / num_x_scores)
-            circle_size_scoreplot = size / num_x_scores
-            label_font = str(13 - num_x_scores) + "pt"
-
-            # Create empty grid
-            grid = np.full((num_x_scores, num_x_scores), None)
-
-            # Append each scoreplot
-            for i in range(len(comb_x_scores)):
-                # Make a copy (as it overwrites the input label/group)
-                label_copy = deepcopy(label)
-                group_copy = self.Y.copy()
-
-                # Scatterplot
-                x, y = comb_x_scores[i]
-                xlabel = "LV {} ({:0.1f}%)".format(x + 1, self.model.pctvar_[x])
-                ylabel = "LV {} ({:0.1f}%)".format(y + 1, self.model.pctvar_[y])
-                gradient = self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x]
-
-                max_range = max(np.max(np.abs(self.model.x_scores_[:, x])), np.max(np.abs(self.model.x_scores_[:, y])))
-                new_range_min = -max_range - 0.05 * max_range
-                new_range_max = max_range + 0.05 * max_range
-                new_range = (new_range_min, new_range_max)
-
-                grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient)
-
-            # Append each distribution curve
-            for i in range(num_x_scores):
-                xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
-                grid[i, i] = distribution(self.model.x_scores_[:, i], group=group_copy, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
-
-            # Append each roc curve
-            for i in range(len(comb_x_scores)):
-                x, y = comb_x_scores[i]
-
-                # Get the optimal combination of x_scores based on rotation of y_loadings_
-                theta = math.atan(self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x])
-                x_rotate = self.model.x_scores_[:, x] * math.cos(theta) + self.model.x_scores_[:, y] * math.sin(theta)
-
-                # ROC Plot with x_rotate
-                fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
-                grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font)
-
-            # Bokeh grid
-            fig = gridplot(grid.tolist())
-
-        output_notebook()
-        show(fig)
 
     @staticmethod
     def pls_simpls(X, Y, ncomp=2):

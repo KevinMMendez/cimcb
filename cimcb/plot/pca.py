@@ -53,7 +53,7 @@ def pca(X, pcx=1, pcy=2, group_label=None, sample_label=None, peak_label=None):
     unique_group = np.sort(np.unique(group_label))
 
     # Set colour per group
-    list_color = ["red", "blue", "green", "black"]
+    list_color = ["red", "blue", "green", "black", "orange", "yellow", "brown", "cyan"]
     while len(list_color) < len(unique_group):  # Loop over list_color if number of groups > len(list_colour)
         list_color += list_color
 

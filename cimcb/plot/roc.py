@@ -17,7 +17,7 @@ from ..utils import binary_metrics, dict_median
 import cimcb.model
 
 
-def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", title="", errorbar=False):
+def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", title="", errorbar=False, roc2=False, fpr2=None, tpr2=None, tpr_ci2=None):
     """Creates a rocplot using Bokeh.
 
     Parameters
@@ -45,19 +45,53 @@ def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Sp
     spec = 1 - fpr
     ci = (tpr_uppci - tpr_lowci) / 2
 
+    if roc2 is True:
+        tpr_lowci2 = tpr_ci2[0]
+        tpr_uppci2 = tpr_ci2[1]
+        tpr_medci2 = tpr_ci2[2]
+        auc = metrics.auc(fpr2, tpr2)
+
+        if median == True:
+            tpr2 = tpr_medci2
+
+        # specificity and ci-interval for HoverTool
+        spec2 = 1 - fpr2
+        ci2 = (tpr_uppci2 - tpr_lowci2) / 2
+
     # Figure
     data = {"x": fpr, "y": tpr, "lowci": tpr_lowci, "uppci": tpr_uppci, "spec": spec, "ci": ci}
+
     source = ColumnDataSource(data=data)
     fig = figure(title=title, plot_width=width, plot_height=height, x_axis_label=xlabel, y_axis_label=ylabel, x_range=(-0.06, 1.06), y_range=(-0.06, 1.06))
 
     # Figure: add line
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal distribution line")
-    figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="ROC Curve (Train)", source=source)
-    fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
+    if roc2 is False:
+        fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal distribution line")
+        figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="ROC Curve (Train)", source=source)
+        fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
 
-    # Figure: add 95CI band
-    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
-    fig.add_layout(figband)
+        # Figure: add 95CI band
+        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
+        fig.add_layout(figband)
+
+    if roc2 is True:
+
+        fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal distribution line")
+        figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="ROC Curve (Model)", source=source)
+        fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
+
+        # Figure: add 95CI band
+        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
+        fig.add_layout(figband)
+
+        data2 = {"x2": fpr2, "y2": tpr2, "lowci2": tpr_lowci2, "uppci2": tpr_uppci2, "spec2": spec2, "ci2": ci2}
+        source2 = ColumnDataSource(data=data2)
+        figline = fig.line("x2", "y2", color="orange", line_width=3.5, alpha=0.6, legend="ROC Curve (Bootstrap IB)", source=source2)
+        fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity (Boot)", "@spec2{1.111}"), ("Sensitivity (Boot)", "@y2{1.111} (+/- @ci2{1.111})")]))
+
+        # Figure: add 95CI band
+        figband = Band(base="x2", lower="lowci2", upper="uppci2", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="orange", source=source2)
+        fig.add_layout(figband)
 
     # Figure: add errorbar  spec =  1 - fpr
     if errorbar is not False:
@@ -98,6 +132,10 @@ def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Sp
     fig.legend.label_text_font_size = "10pt"
     if legend is False:
         fig.legend.visible = False
+
+    if roc2 is True:
+        fig.legend.visible = True
+
     return fig
 
 

@@ -1,4 +1,5 @@
 from .binary_metrics import binary_metrics
+from .multiclass_metrics import multiclass_metrics
 from .ci95_ellipse import ci95_ellipse
 from .dict_mean import dict_mean
 from .dict_median import dict_median
@@ -16,4 +17,4 @@ from .wmean import wmean
 from .YpredCallback import YpredCallback
 from .color_scale import color_scale
 
-__all__ = ["binary_metrics", "ci95_ellipse", "dict_mean", "dict_median", "dict_std", "dict_perc", "knnimpute", "load_comparisonXL", "load_dataXL", "load_dataCSV", "scale", "nested_getattr", "table_check", "univariate_2class", "wmean", "YpredCallback", "color_scale"]
+__all__ = ["binary_metrics", "multiclass_metrics", "ci95_ellipse", "dict_mean", "dict_median", "dict_std", "dict_perc", "knnimpute", "load_comparisonXL", "load_dataXL", "load_dataCSV", "scale", "nested_getattr", "table_check", "univariate_2class", "wmean", "YpredCallback", "color_scale"]

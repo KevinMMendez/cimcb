@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 from abc import ABC, abstractmethod
-from copy import deepcopy
+from copy import deepcopy, copy
 from ..utils import nested_getattr
 
 
@@ -10,7 +10,10 @@ class BaseBootstrap(ABC):
 
     @abstractmethod
     def __init__(self, model, X, Y, bootlist, bootnum=100, seed=None):
-        self.model = deepcopy(model)  # Make a copy of the model
+        try:
+            self.model = deepcopy(model)  # Make a copy of the model
+        except TypeError:
+            self.model = copy(model)
         self.X = X
         self.Y = Y
         self.bootlist = bootlist

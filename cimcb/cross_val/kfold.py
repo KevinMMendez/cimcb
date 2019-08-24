@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from joblib import Parallel, delayed
 import timeit
 import time
@@ -7,7 +8,7 @@ from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
 from sklearn.model_selection import ParameterGrid
 from .BaseCrossVal import BaseCrossVal
-from ..utils import binary_metrics, dict_perc, dict_median
+from ..utils import binary_metrics, multiclass_metrics, dict_perc, dict_median
 
 
 class kfold(BaseCrossVal):
@@ -138,13 +139,23 @@ class kfold(BaseCrossVal):
             actual_epoch = epoch_list[i]
             ypred_full.append(ypred_full_i[actual_epoch])
         # CV
+        # if Y is one-hot encoded, flatten it for Stratified Kfold
+        try:
+            if len(Y[0]) > 1:
+                dummy = pd.DataFrame(Y)
+                stratY = dummy.idxmax(axis=1)
+            else:
+                stratY = Y
+        except TypeError:
+            stratY = Y
+        # split
         if len(self.X) == len(self.Y):
             fold_split = []
-            for train, test in self.crossval_idx.split(self.X, self.Y):
+            for train, test in self.crossval_idx.split(self.X, stratY):
                 fold_split.append((train, test))
         else:
             fold_split = []
-            for train, test in self.crossval_idx.split(self.X[0], self.Y):
+            for train, test in self.crossval_idx.split(self.X[0], stratY):
                 fold_split.append((train, test))
         # Split into train and test
         ypred_cv_i = np.zeros((len(self.Y), len(epoch_list)))
@@ -192,8 +203,22 @@ class kfold(BaseCrossVal):
 
             # Get all monte-carlo
             for k in range(len(self.ypred_full[i])):
-                full_mc = binary_metrics(self.Y, self.ypred_full[i][k], parametric=self.model.parametric)
-                cv_mc = binary_metrics(self.Y, self.ypred_cv[i][k], parametric=self.model.parametric)
+
+                # Check if binary
+                try:
+                    if len(self.Y[0]) > 1:
+                        multiclass = True
+                    else:
+                        multiclass = False
+                except TypeError:
+                    multiclass = False
+
+                if multiclass == True:
+                    full_mc = multiclass_metrics(self.Y, self.ypred_full[i][k], parametric=self.model.parametric)
+                    cv_mc = multiclass_metrics(self.Y, self.ypred_cv[i][k], parametric=self.model.parametric)
+                else:
+                    full_mc = binary_metrics(self.Y, self.ypred_full[i][k], parametric=self.model.parametric)
+                    cv_mc = binary_metrics(self.Y, self.ypred_cv[i][k], parametric=self.model.parametric)
                 full_loop.append(full_mc)
                 cv_loop.append(cv_mc)
 
@@ -234,8 +259,19 @@ class kfold(BaseCrossVal):
     def _calc_cv_ypred(self, model_i, X, Y):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
+
+        # if Y is one-hot encoded, flatten it for Stratified Kfold
+        try:
+            if len(Y[0]) > 1:
+                dummy = pd.DataFrame(Y)
+                stratY = dummy.idxmax(axis=1)
+            else:
+                stratY = Y
+        except TypeError:
+            stratY = Y
+
         if len(X) == len(Y):
-            for train, test in self.crossval_idx.split(self.X, self.Y):
+            for train, test in self.crossval_idx.split(X, stratY):
                 X_train = X[train, :]
                 Y_train = Y[train]
                 X_test = X[test, :]
@@ -246,9 +282,9 @@ class kfold(BaseCrossVal):
                     ypred_cv_i[idx] = val.tolist()
         else:
             # Multiblock study
-            X0 = self.X[0]
-            X1 = self.X[1]
-            for train, test in self.crossval_idx.split(X0, self.Y):
+            X0 = X[0]
+            X1 = X[1]
+            for train, test in self.crossval_idx.split(X0, stratY):
                 X0_train = X0[train, :]
                 X1_train = X1[train, :]
                 X_train = [X0_train, X1_train]

@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-from copy import deepcopy
+from copy import deepcopy, copy
 from bokeh.layouts import gridplot
 from bokeh.models import HoverTool, Slope, Span
 from bokeh.plotting import ColumnDataSource, figure
@@ -26,7 +26,10 @@ def permutation_test(model, X, Y, nperm=100, folds=8):
         Response variables, where n_samples is the number of samples.
     """
 
-    model = deepcopy(model)
+    try:
+        model = deepcopy(model)  # Make a copy of the model
+    except TypeError:
+        model = copy(model)
 
     # Get train and test idx using Stratified KFold
     skf = StratifiedKFold(n_splits=folds)
