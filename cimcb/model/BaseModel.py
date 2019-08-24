@@ -4,9 +4,11 @@ import pandas as pd
 import scipy
 import collections
 import math
+from tqdm import tqdm
 from scipy.stats import logistic
 from itertools import combinations
 from copy import deepcopy, copy
+from sklearn.model_selection import StratifiedKFold
 from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.models import HoverTool, Band
 from bokeh.models.widgets import DataTable, Div, TableColumn
@@ -811,7 +813,147 @@ class BaseModel(ABC):
                     fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
                     fpr_boot, tpr_boot, tpr_ci_boot = roc_calculate(group_copy, x_rotate_boot, bootnum=100)
 
-                    grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
+                    grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=True, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
+            # Bokeh grid
+            fig = gridplot(grid.tolist())
+
+        self.model.x_scores_ = x_scores_true
+        output_notebook()
+        show(fig)
+
+    def plot_projections_kfold(self, label=None, size=12, ci95=True, scatterplot=True, weight_alt=False, folds=10, n_mc=10):
+        """ Plots latent variables projections against each other in a Grid format.
+
+        Parameters
+        ----------
+        label : DataFrame or None, (default None)
+            hovertool for scatterplot.
+
+        size : positive integer, (default 12)
+            size specifies circle size for scatterplot.
+        """
+
+        # Get copy of self
+        try:
+            kmodel = deepcopy(self)  # Make a copy of the model
+        except TypeError:
+            kmodel = copy(self)
+
+        x_scores_true = deepcopy(self.model.x_scores_)
+        if weight_alt is True:
+            self.model.x_scores_ = self.model.x_scores_alt
+
+        x_scores_mc = []
+        crossval_idx = StratifiedKFold(n_splits=folds, shuffle=True)
+        for i in tqdm(range(n_mc)):
+            x_scores_cv = [None] * len(self.Y)
+            for train, test in crossval_idx.split(self.X, self.Y):
+                X_train = self.X[train, :]
+                Y_train = self.Y[train]
+                X_test = self.X[test, :]
+                kmodel.train(X_train, Y_train)
+                kmodel.test(X_test)
+                if weight_alt is False:
+                    x_scores_cv_i = kmodel.model.x_scores_
+                else:
+                    x_scores_cv_i = kmodel.model.x_scores_alt
+                # Return value to y_pred_cv in the correct position # Better way to do this
+                for (idx, val) in zip(test, x_scores_cv_i):
+                    x_scores_cv[idx] = val.tolist()
+            x_scores_mc.append(x_scores_cv)
+
+        x_scores_cv = np.median(np.array(x_scores_mc), axis=0)
+
+        x_scores_true = deepcopy(self.model.x_scores_)
+        if weight_alt is True:
+            self.model.x_scores_ = self.model.x_scores_alt
+
+        num_x_scores = len(self.model.x_scores_.T)
+
+        # If there is only 1 x_score, Need to plot x_score vs. peak (as opposided to x_score[i] vs. x_score[j])
+        if num_x_scores == 1:
+            # Violin plot
+            violin_bokeh = boxplot(self.Y_pred.flatten(), self.Y, title="", xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315)
+            # Distribution plot
+            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+            # ROC plot
+            fpr, tpr, tpr_ci = roc_calculate(self.Y, self.Y_pred, bootnum=100)
+            roc_bokeh = roc_plot(fpr, tpr, tpr_ci, width=310, height=315)
+            # Score plot
+            y = self.model.x_scores_[:, 0].tolist()
+            # get label['Idx'] if it exists
+            try:
+                x = label["Idx"].values.ravel()
+            except:
+                x = []
+                for i in range(len(y)):
+                    x.append(i)
+            scatter_bokeh = scatter(x, y, label=label, group=self.Y, ylabel="LV {} ({:0.1f}%)".format(1, self.model.pctvar_[0]), xlabel="Idx", legend=True, title="", width=950, height=315, hline=0, size=int(size / 2), hover_xy=False)
+
+            # Combine into one figure
+            fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh], [scatter_bokeh]])
+
+        else:
+
+            if weight_alt is False:
+                a = 'model.x_scores_'
+            else:
+                a = 'model.x_scores_alt'
+
+            boot_xscores = x_scores_cv
+
+            comb_x_scores = list(combinations(range(num_x_scores), 2))
+
+            # Width/height of each scoreplot
+            width_height = int(950 / num_x_scores)
+            circle_size_scoreplot = size / num_x_scores
+            label_font = str(13 - num_x_scores) + "pt"
+
+            # Create empty grid
+            grid = np.full((num_x_scores, num_x_scores), None)
+
+            # Append each scoreplot
+            for i in range(len(comb_x_scores)):
+                # Make a copy (as it overwrites the input label/group)
+                label_copy = deepcopy(label)
+                group_copy = self.Y.copy()
+
+                # Scatterplot
+                x, y = comb_x_scores[i]
+                xlabel = "LV {} ({:0.1f}%)".format(x + 1, self.model.pctvar_[x])
+                ylabel = "LV {} ({:0.1f}%)".format(y + 1, self.model.pctvar_[y])
+                gradient = self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x]
+
+                max_range = max(np.max(np.abs(self.model.x_scores_[:, x])), np.max(np.abs(self.model.x_scores_[:, y])))
+                new_range_min = -max_range - 0.05 * max_range
+                new_range_max = max_range + 0.05 * max_range
+                new_range = (new_range_min, new_range_max)
+
+                grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=ci95, scatterplot=scatterplot, extraci95_x=boot_xscores[:, x].tolist(), extraci95_y=boot_xscores[:, y].tolist(), extraci95=True)
+
+            # Append each distribution curve
+            group_dist = np.concatenate((self.Y, (self.Y + 2)))
+
+            for i in range(num_x_scores):
+                score_dist = np.concatenate((self.model.x_scores_[:, i], boot_xscores[:, i]))
+                xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
+                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+
+            # Append each roc curve
+            for i in range(len(comb_x_scores)):
+                x, y = comb_x_scores[i]
+
+                # Get the optimal combination of x_scores based on rotation of y_loadings_
+                theta = math.atan(self.model.y_loadings_[0][y] / self.model.y_loadings_[0][x])
+                x_rotate = self.model.x_scores_[:, x] * math.cos(theta) + self.model.x_scores_[:, y] * math.sin(theta)
+                x_rotate_boot = boot_xscores[:, x] * math.cos(theta) + boot_xscores[:, y] * math.sin(theta)
+
+                # ROC Plot with x_rotate
+                fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
+                fpr_boot, tpr_boot, tpr_ci_boot = roc_calculate(group_copy, x_rotate_boot, bootnum=100)
+
+                grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
+
             # Bokeh grid
             fig = gridplot(grid.tolist())
 
