@@ -133,9 +133,6 @@ def roc_plot(fpr, tpr, tpr_ci, median=False, width=450, height=350, xlabel="1-Sp
     if legend is False:
         fig.legend.visible = False
 
-    if roc2 is True:
-        fig.legend.visible = True
-
     return fig
 
 
