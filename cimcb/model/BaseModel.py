@@ -83,7 +83,7 @@ class BaseModel(ABC):
         self.boot = boot
         self.bootci = self.boot.run()
 
-    def plot_featureimportance(self, PeakTable, peaklist=None, ylabel="Label", sort=True):
+    def plot_featureimportance(self, PeakTable, peaklist=None, ylabel="Label", sort=True, sort_ci=True):
         """Plots feature importance metrics.
 
         Parameters
@@ -129,8 +129,11 @@ class BaseModel(ABC):
         peaklabel = PeakTable[ylabel]
 
         # Plot
-        fig_1 = scatterCI(self.model.coef_, ci=ci_coef, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title=name_coef, sort_abs=sort)
-        fig_2 = scatterCI(self.model.vip_, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title=name_vip, sort_abs=sort)
+        fig_1 = scatterCI(self.model.coef_, ci=ci_coef, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title=name_coef, sort_abs=sort, sort_ci=sort_ci)
+        if name_vip == "Variable Importance in Projection (VIP)":
+            fig_2 = scatterCI(self.model.vip_, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title=name_vip, sort_abs=sort, sort_ci=sort_ci, sort_ci_abs=True)
+        else:
+            fig_2 = scatterCI(self.model.vip_, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=False, title=name_vip, sort_abs=sort, sort_ci_abs=True)
         fig = layout([[fig_1], [fig_2]])
         output_notebook()
         show(fig)
@@ -147,15 +150,24 @@ class BaseModel(ABC):
             vip = pd.DataFrame([self.model.vip_, self.bootci["model.vip_"]]).T
             vip.rename(columns={0: "VIP", 1: "VIP-95CI"}, inplace=True)
 
-        Peaksheet = PeakTable.copy()
-        Peaksheet["Coef"] = coef["Coef"].values
-        Peaksheet["VIP"] = vip["VIP"].values
-        if hasattr(self, "bootci"):
-            Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
-            Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
+        if name_vip == "Coefficient Plot":
+            Peaksheet = PeakTable.copy()
+            Peaksheet["Coef"] = coef["Coef"].values
+            Peaksheet["VIP"] = vip["VIP"].values
+            if hasattr(self, "bootci"):
+                Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
+                Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
+        else:
+            Peaksheet = PeakTable.copy()
+            Peaksheet["CW"] = coef["Coef"].values
+            Peaksheet["GA"] = vip["VIP"].values
+            if hasattr(self, "bootci"):
+                Peaksheet["CW-95CI"] = coef["Coef-95CI"].values
+                Peaksheet["GA-95CI"] = vip["VIP-95CI"].values
+
         return Peaksheet
 
-    def plot_loadings(self, PeakTable, peaklist=None, ylabel="Label", sort=False):
+    def plot_loadings(self, PeakTable, peaklist=None, ylabel="Label", sort=False, sort_ci=True):
         """Plots feature importance metrics.
 
         Parameters
@@ -205,7 +217,8 @@ class BaseModel(ABC):
                             hline=0,
                             col_hline=True,
                             title="Loadings Plot: LV{}".format(i + 1),
-                            sort_abs=sort)
+                            sort_abs=sort,
+                            sort_ci=sort_ci)
             plots.append([fig])
 
         fig = layout(plots)
@@ -529,7 +542,7 @@ class BaseModel(ABC):
             violin_bokeh.multi_line([[-100, 100]], [[stats["val_cutoffscore"], stats["val_cutoffscore"]]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
         # Distribution plot
-        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt", smooth=dist_smooth)
+        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt", smooth=dist_smoot)
         if errorbar is True:
             dist_bokeh.multi_line([[stats["val_cutoffscore"], stats["val_cutoffscore"]]], [[-100, 100]], line_color="black", line_width=2, line_alpha=1.0, line_dash="dashed")
 
@@ -654,6 +667,9 @@ class BaseModel(ABC):
         x_scores_true = deepcopy(self.model.x_scores_)
         if weight_alt is True:
             self.model.x_scores_ = self.model.x_scores_alt
+            sigmoid = True
+        else:
+            sigmoid = False
 
         num_x_scores = len(self.model.x_scores_.T)
 
@@ -662,7 +678,7 @@ class BaseModel(ABC):
             # Violin plot
             violin_bokeh = boxplot(self.Y_pred.flatten(), self.Y, title="", xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315)
             # Distribution plot
-            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, sigmoid=sigmoid)
             # ROC plot
             fpr, tpr, tpr_ci = roc_calculate(self.Y, self.Y_pred, bootnum=100)
             roc_bokeh = roc_plot(fpr, tpr, tpr_ci, width=310, height=315)
@@ -709,12 +725,15 @@ class BaseModel(ABC):
                     new_range_max = max_range + 0.05 * max_range
                     new_range = (new_range_min, new_range_max)
 
-                    grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=ci95, scatterplot=scatterplot)
+                    if weight_alt is True:
+                        new_range = (0.1, 1.1)
+
+                    grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, gradient_alt=weight_alt, ci95=ci95, scatterplot=scatterplot)
 
                 # Append each distribution curve
                 for i in range(num_x_scores):
                     xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
-                    grid[i, i] = distribution(self.model.x_scores_[:, i], group=group_copy, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+                    grid[i, i] = distribution(self.model.x_scores_[:, i], group=group_copy, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid)
 
                 # Append each roc curve
                 for i in range(len(comb_x_scores)):
@@ -790,7 +809,10 @@ class BaseModel(ABC):
                     new_range_max = max_range + 0.05 * max_range
                     new_range = (new_range_min, new_range_max)
 
-                    grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=ci95, scatterplot=scatterplot, extraci95_x=boot_xscores[:, x].tolist(), extraci95_y=boot_xscores[:, y].tolist(), extraci95=True)
+                    if weight_alt is True:
+                        new_range = (-0.3, 1.3)
+
+                    grid[y, x] = scatter(self.model.x_scores_[:, x].tolist(), self.model.x_scores_[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, gradient_alt=weight_alt, ci95=ci95, scatterplot=scatterplot, extraci95_x=boot_xscores[:, x].tolist(), extraci95_y=boot_xscores[:, y].tolist(), extraci95=True)
 
                 # Append each distribution curve
                 group_dist = np.concatenate((self.Y, (self.Y + 2)))
@@ -798,7 +820,7 @@ class BaseModel(ABC):
                 for i in range(num_x_scores):
                     score_dist = np.concatenate((self.model.x_scores_[:, i], boot_xscores[:, i]))
                     xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
-                    grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+                    grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid)
 
                 # Append each roc curve
                 for i in range(len(comb_x_scores)):
@@ -842,6 +864,9 @@ class BaseModel(ABC):
         x_scores_true = deepcopy(self.model.x_scores_)
         if weight_alt is True:
             self.model.x_scores_ = self.model.x_scores_alt
+            sigmoid = True
+        else:
+            sigmoid = False
 
         x_scores_mc = []
         crossval_idx = StratifiedKFold(n_splits=folds, shuffle=True)
@@ -875,7 +900,7 @@ class BaseModel(ABC):
             # Violin plot
             violin_bokeh = boxplot(self.Y_pred.flatten(), self.Y, title="", xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315)
             # Distribution plot
-            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315)
+            dist_bokeh = distribution(self.Y_pred, group=self.Y, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, sigmoid=sigmoid)
             # ROC plot
             fpr, tpr, tpr_ci = roc_calculate(self.Y, self.Y_pred, bootnum=100)
             roc_bokeh = roc_plot(fpr, tpr, tpr_ci, width=310, height=315)
@@ -937,7 +962,7 @@ class BaseModel(ABC):
             for i in range(num_x_scores):
                 score_dist = np.concatenate((self.model.x_scores_[:, i], boot_xscores[:, i]))
                 xlabel = "LV {} ({:0.1f}%)".format(i + 1, self.model.pctvar_[i])
-                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid)
 
             # Append each roc curve
             for i in range(len(comb_x_scores)):
