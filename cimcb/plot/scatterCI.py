@@ -4,7 +4,7 @@ from bokeh.models import Span, Whisker
 from bokeh.plotting import ColumnDataSource, figure
 
 
-def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, col_hline=True, col_palette=None, title="Scatter CI Plot", xlabel="Peak", ylabel="Value", width=200, height=300, legend=True, font_size="20pt", label_font_size="13pt", linkrange=None):
+def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, col_hline=True, col_palette=None, title="Scatter CI Plot", xlabel="Peak", ylabel="Value", width=200, height=300, legend=True, font_size="20pt", label_font_size="13pt", linkrange=None, sort_ci=True, sort_ci_abs=False):
     """Creates a scatterCI plot using Bokeh.
 
     Required Parameters
@@ -59,10 +59,64 @@ def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, 
 
     # Sort data (absolute)
     if sort_abs is True:
-        sorted_idx = np.argsort(abs(x))[::-1]
+        if ci is None:
+            sorted_idx = np.argsort(abs(x))[::-1]
+        else:
+            if sort_ci is False:
+                sorted_idx = np.argsort(abs(x))[::-1]
+            else:
+                if sort_ci_abs is False:
+                    hline2 = hline
+                else:
+                    hline2 = -100000
+                ciorder = ci - hline2
+                ciorder_idx = list(range(len(x)))
+                ciorder_min = []
+                ciorder_sign = []
+                for i in range(len(ciorder)):
+                    minval = np.min(np.abs(ciorder[i]))
+                    ciorder_min.append(minval)
+                    if np.sign(ciorder[i][0]) == np.sign(ciorder[i][1]):
+                        sign = True
+                    else:
+                        sign = False
+                    ciorder_sign.append(sign)
+
+                ciorder_min = np.array(ciorder_min)
+                ciorder_sign = np.array(ciorder_sign)
+                ciorder_idx = np.array(ciorder_idx)
+
+                ciorder_min_signSame = []
+                ciorder_min_signDiff = []
+
+                ciorder_min_signSameidx = []
+                ciorder_min_signDiffidx = []
+
+                for i in range(len(ciorder_min)):
+                    if ciorder_sign[i] == True:
+                        ciorder_min_signSame.append(ciorder_min[i])
+                        ciorder_min_signSameidx.append(ciorder_idx[i])
+                    else:
+                        ciorder_min_signDiff.append(ciorder_min[i])
+                        ciorder_min_signDiffidx.append(ciorder_idx[i])
+
+                sorted_idx = []
+                sorted_idx2 = []
+                ciorder_min_signSame_argsort = np.argsort(ciorder_min_signSame)[::-1]
+                for i in ciorder_min_signSame_argsort:
+                    sorted_idx.append(ciorder_min_signSameidx[i])
+                    sorted_idx2.append(ciorder_min_signSameidx[i])
+
+                ciorder_min_signDiff_argsort = np.argsort(ciorder_min_signDiff)[::-1]
+                for i in ciorder_min_signDiff_argsort:
+                    sorted_idx.append(ciorder_min_signDiffidx[i])
+
+                sorted_idx = np.array(sorted_idx)
+
         x = x[sorted_idx]
         label_copy = np.array(label_copy)
         label_copy = label_copy[sorted_idx]
+        label_copy2 = label_copy[sorted_idx2]
         col = np.array(col)
         col = col[sorted_idx]
         # Sort ci if it exists
@@ -76,6 +130,7 @@ def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, 
         hoverlabel = hoverlabel.copy()
         # hoverlabel = hoverlabel.reset_index()
         # hoverlabel = hoverlabel.reindex(sorted_idx).drop('index', axis=1)
+
     elif sort_abs is False:
         pass
 
