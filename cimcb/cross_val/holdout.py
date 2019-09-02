@@ -204,8 +204,10 @@ class holdout(BaseCrossVal):
                 std_list.append(std_combined)
 
         self.table = self._format_table(stats_list)  # Transpose, Add headers
+        self.table = self.table.reindex(index=np.sort(self.table.index))
         if self.n_mc > 1:
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
+            self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
         return self.table
 
     def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True):
