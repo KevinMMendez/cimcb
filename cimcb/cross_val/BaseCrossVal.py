@@ -144,6 +144,7 @@ class BaseCrossVal(ABC):
                 std_combined = {**std_full_i, **std_cv_i}
                 std_list.append(std_combined)
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
+            self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
 
         # Choose metric to plot
         metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
@@ -368,6 +369,7 @@ class BaseCrossVal(ABC):
                 std_combined = {**std_full_i, **std_cv_i}
                 std_list.append(std_combined)
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
+            self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
 
         metric_list = np.array(["acc", "aic", "auc", "bic", "f1score", "prec", "r2q2", "sens", "spec", "sse"])
         metric_idx = np.where(metric_list == metric)[0][0]
