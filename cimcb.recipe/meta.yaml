@@ -1,6 +1,6 @@
 package:
   name: cimcb
-  version: 1.0.39
+  version: 1.1.0
 
 source:
   path: ../
