@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from bokeh.plotting import ColumnDataSource, figure
 from bokeh.models import Slope, Span, HoverTool
+from bokeh.models import Range1d
 from ..utils import ci95_ellipse
 
 
@@ -131,6 +132,7 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
             list_color += list_color
 
         # Add 95% confidence ellipse for each unique group in a loop
+        max_val = []
         for i in range(len(unique_group)):
             # Get scores for the corresponding group
             group_i_x = []
@@ -152,6 +154,10 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
             # Plot ci95 ellipse shade
             fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
             fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
+            fig.x(np.median(m[:, 0]), np.median(m[:, 1]), size=size, alpha=0.6, color=list_color[i], line_width=2)
+
+            maxv = max(np.abs(p).flatten())
+            max_val.append(maxv)
 
         if extraci95 is True:
                 # if group is None
@@ -191,8 +197,18 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
                 # Plot ci95 ellipse shade
                 fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
                 fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
+                fig.x(np.median(m[:, 0]), np.median(m[:, 1]), size=size, alpha=0.6, color=list_color[i], line_width=2)
 
-        # Font-sizes
+                maxv = max(np.abs(p).flatten())
+                max_val.append(maxv)
+
+        max_range = max(max_val)
+        new_range_min = -max_range - 0.05 * max_range
+        new_range_max = max_range + 0.05 * max_range
+        fig.y_range = Range1d(new_range_min, new_range_max)
+        fig.x_range = Range1d(new_range_min, new_range_max)
+
+    # Font-sizes
     fig.title.text_font_size = font_size
     fig.xaxis.axis_label_text_font_size = label_font_size
     fig.yaxis.axis_label_text_font_size = label_font_size

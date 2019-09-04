@@ -62,26 +62,26 @@ class BaseModel(ABC):
             raise ValueError("length of X does not match length of Y.")
         return X, Y
 
-    def calc_bootci(self, bootnum=100, type="bca"):
-        """Calculates bootstrap confidence intervals based on bootlist.
+    # def calc_bootci(self, bootnum=100, type="bca"):
+    #     """Calculates bootstrap confidence intervals based on bootlist.
 
-        Parameters
-        ----------
-        bootnum : a positive integer, (default 100)
-            The number of bootstrap samples used in the computation.
+    #     Parameters
+    #     ----------
+    #     bootnum : a positive integer, (default 100)
+    #         The number of bootstrap samples used in the computation.
 
-        type : 'bc', 'bca', 'perc', (default 'bca')
-            Methods for bootstrap confidence intervals. 'bc' is bias-corrected bootstrap confidence intervals. 'bca' is bias-corrected and accelerated bootstrap confidence intervals. 'perc' is percentile confidence intervals.
-        """
-        bootlist = self.bootlist
-        if type is "bca":
-            boot = BCA(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-        if type is "bc":
-            boot = BC(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-        if type is "perc":
-            boot = Perc(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-        self.boot = boot
-        self.bootci = self.boot.run()
+    #     type : 'bc', 'bca', 'perc', (default 'bca')
+    #         Methods for bootstrap confidence intervals. 'bc' is bias-corrected bootstrap confidence intervals. 'bca' is bias-corrected and accelerated bootstrap confidence intervals. 'perc' is percentile confidence intervals.
+    #     """
+    #     bootlist = self.bootlist
+    #     if type is "bca":
+    #         boot = BCA(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
+    #     if type is "bc":
+    #         boot = BC(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
+    #     if type is "perc":
+    #         boot = Perc(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
+    #     self.boot = boot
+    #     self.bootci = self.boot.run()
 
     def plot_featureimportance(self, PeakTable, peaklist=None, ylabel="Label", sort=True, sort_ci=True):
         """Plots feature importance metrics.
@@ -106,7 +106,7 @@ class BaseModel(ABC):
             New PeakTable with added "Coef" and "VIP" columns (+ "Coef-95CI" and  "VIP-95CI" if calc_bootci is used prior to plot_featureimportance).
         """
         if not hasattr(self, "bootci"):
-            print("Use method calc_bootci prior to plot_featureimportance to add 95% confidence intervals to plots.")
+            # print("Use method calc_bootci prior to plot_featureimportance to add 95% confidence intervals to plots.")
             ci_coef = None
             ci_vip = None
         else:
@@ -191,7 +191,7 @@ class BaseModel(ABC):
         """
         n_loadings = len(self.model.x_loadings_[0])
         if not hasattr(self, "bootci"):
-            print("Use method calc_bootci prior to plot_loadings to add 95% confidence intervals to plots.")
+            # print("Use method calc_bootci prior to plot_loadings to add 95% confidence intervals to plots.")
             ci_loadings = None
         else:
             ci_loadings = self.bootci["model.x_loadings_"]
@@ -659,7 +659,7 @@ class BaseModel(ABC):
         """
 
         if not hasattr(self, "bootci"):
-            print("Use method calc_bootci prior to plot_projections.")
+            # print("Use method calc_bootci prior to plot_projections.")
             bootx = None
         else:
             bootx = 1

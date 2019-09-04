@@ -116,7 +116,6 @@ def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, 
         x = x[sorted_idx]
         label_copy = np.array(label_copy)
         label_copy = label_copy[sorted_idx]
-        label_copy2 = label_copy[sorted_idx2]
         col = np.array(col)
         col = col[sorted_idx]
         # Sort ci if it exists

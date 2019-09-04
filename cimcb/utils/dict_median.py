@@ -11,5 +11,5 @@ def dict_median(dict_list):
         if np.isnan(value_arr).any() == True:
             median_dict[key] = np.nan
         else:
-            median_dict[key] = np.median(value)
+            median_dict[key] = np.median(value,)
     return median_dict

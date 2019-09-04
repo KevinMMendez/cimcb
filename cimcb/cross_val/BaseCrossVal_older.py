@@ -5,6 +5,7 @@ import math
 import multiprocessing
 from abc import ABC, abstractmethod
 from sklearn import metrics
+from copy import deepcopy
 from bokeh.layouts import gridplot, layout
 from bokeh import events
 from bokeh.plotting import figure, output_notebook, show
@@ -12,10 +13,17 @@ from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet,
 from itertools import product
 from sklearn.model_selection import ParameterGrid
 from sklearn import preprocessing
-from itertools import combinations
-from copy import deepcopy
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot, roc_plot_cv
 from ..utils import color_scale, dict_perc
+from bokeh.models.widgets import DataTable, Div, TableColumn
+from bokeh.models.annotations import Title
+from bokeh.plotting import ColumnDataSource, figure, output_notebook, show
+from scipy import interp
+from sklearn import metrics
+from sklearn.utils import resample
+from ..bootstrap import Perc, BC, BCA
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot
+from ..utils import binary_metrics
+from itertools import combinations
 
 
 class BaseCrossVal(ABC):
@@ -48,6 +56,10 @@ class BaseCrossVal(ABC):
             if len(value) > 1:
                 self.param_dict2 = {**self.param_dict2, **{key: value}}
         self.param_list2 = list(ParameterGrid(self.param_dict2))
+
+        # Calculate x_scores_ if it exists
+        if "model.x_scores_" in self.model.bootlist:
+            self.x_scores_calc = True
 
         # if n_cores = -1, set n_cores to max_cores
         max_num_cores = multiprocessing.cpu_count()
@@ -109,7 +121,6 @@ class BaseCrossVal(ABC):
 
         x_scores_full = self.x_scores_full[::-1][0][0]
         x_scores_cv = np.median(self.x_scores_cv[::-1][0], axis=0)
-        x_scores_cvall = np.array(self.x_scores_cv[::-1][0])
         scatterplot = scatter2
         num_x_scores = len(x_scores_full.T)
         sigmoid = False
@@ -165,21 +176,11 @@ class BaseCrossVal(ABC):
                 x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
 
-                self.x_rotate = x_rotate
-                self.Y = group_copy
-                self.x_rotate_boot = []
-                for i in range(len(x_scores_cvall)):
-                    x_rot = x_scores_cvall[i][:, x] * math.cos(theta) + x_scores_cvall[i][:, y] * math.sin(theta)
-                    self.x_rotate_boot.append(x_rot)
-                self.x_rotate_boot = np.array(self.x_rotate_boot)
-                x_rotate_boot = self.x_rotate_boot
                 # ROC Plot with x_rotate
-                # fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
-                # fpr_boot, tpr_boot, tpr_ci_boot = roc_calculate(group_copy, x_rotate_boot, bootnum=100)
+                fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
+                fpr_boot, tpr_boot, tpr_ci_boot = roc_calculate(group_copy, x_rotate_boot, bootnum=100)
 
-                # grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
-
-                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font)
+                grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())
@@ -229,7 +230,6 @@ class BaseCrossVal(ABC):
                 std_combined = {**std_full_i, **std_cv_i}
                 std_list.append(std_combined)
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
-            self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
 
         # Choose metric to plot
         metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
@@ -454,7 +454,6 @@ class BaseCrossVal(ABC):
                 std_combined = {**std_full_i, **std_cv_i}
                 std_list.append(std_combined)
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
-            self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
 
         metric_list = np.array(["acc", "aic", "auc", "bic", "f1score", "prec", "r2q2", "sens", "spec", "sse"])
         metric_idx = np.where(metric_list == metric)[0][0]

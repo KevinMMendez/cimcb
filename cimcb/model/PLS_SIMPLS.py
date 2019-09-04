@@ -35,7 +35,7 @@ class PLS_SIMPLS(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2):
         self.model = PLSRegression()  # Should change this to an empty model
@@ -117,6 +117,7 @@ class PLS_SIMPLS(BaseModel):
         # Calculate and return Y predicted value
         newX = np.insert(X, 0, np.ones(len(X)), axis=1)
         y_pred_test = np.matmul(newX, self.model.beta_)
+        self.Y_pred = y_pred_test
         return y_pred_test
 
     @staticmethod
