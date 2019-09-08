@@ -1,6 +1,6 @@
 package:
   name: cimcb
-  version: 1.1.0
+  version: 2.0.1
 
 source:
   path: ../
@@ -45,6 +45,6 @@ requirements:
 
 about:
   home: https://github.com/CIMCB
-  license: http://www.apache.org/licenses/LICENSE-2.0.html
-  summary: "This is a pre-release."
+  license: MIT
+  summary: "A package containing the necessary tools for the statistical analysis of untargeted and targeted metabolomics data."
 

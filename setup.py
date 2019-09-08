@@ -2,16 +2,17 @@ from setuptools import setup
 
 
 def readme():
-    with open('README.md', encoding='utf-8') as f:
-        return f.read()
-  
+  with open('README.md', encoding='utf-8') as f:
+    return f.read()
+
+
 setup(
     name="cimcb",
-    version="1.1.0",
-    description="This is a pre-release.",
+    version="2.0.1",
+    description="A package containing the necessary tools for the statistical analysis of untargeted and targeted metabolomics data.",
     long_description=readme(),
     long_description_content_type='text/markdown',
-    license="http://www.apache.org/licenses/LICENSE-2.0.html",
+    license="MIT",
     url="https://github.com/KevinMMendez/cimcb",
     packages=["cimcb", "cimcb.bootstrap", "cimcb.cross_val", "cimcb.model", "cimcb.plot", "cimcb.utils"],
     python_requires=">=3.5",
