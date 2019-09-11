@@ -33,11 +33,10 @@ from .NN_ReluLogit import NN_ReluLogit
 from .NN_ReluTan import NN_ReluTan
 from .NN_ReluRelu import NN_ReluRelu
 from .RBF_NN import RBF_NN
-from .SWNN_LinearLinear import SWNN_LinearLinear
 
 
 __all__ = ["NN_LinearSigmoid", "NN_SigmoidSigmoid", "NN_SoftmaxSoftmax", "MBNN_LinearSigmoid", "MBNN_SigmoidSigmoid", "NN_SigmoidSigmoidSigmoid", "NN_LinearLogit_Sklearn", "NN_LogitLogit_Sklearn", "PCLR", "PCR", "PLS_SIMPLS", "PLS_NIPALS", "RF", "SVM", "NN_L1", "NN_L2",
            "NN_LinearLinear", "NN_LinearLogit", "NN_LinearTan", "NN_LinearRelu", " NN_LogitLinear", "NN_LogitLogit",
            "NN_LogitTan", "NN_LogitRelu",
            "NN_TanLinear", "NN_TanLogit", "NN_TanTan", "NN_TanRelu",
-           "NN_ReluLinear", "NN_ReluLogit", "NN_ReluTan", "NN_ReluRelu", "RBF_NN", "SWNN_LinearLinear"]
+           "NN_ReluLinear", "NN_ReluLogit", "NN_ReluTan", "NN_ReluRelu", "RBF_NN"]
