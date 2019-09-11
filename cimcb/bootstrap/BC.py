@@ -8,7 +8,7 @@ from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.plotting import ColumnDataSource, figure, output_notebook, show
 from .BaseBootstrap import BaseBootstrap
 from itertools import combinations
-from ..plot import scatterCI, boxplot, distribution, roc_plot_boot2, scatter
+from ..plot import scatterCI, boxplot, distribution, roc_plot_boot2, scatter, scatter_ellipse
 from ..utils import nested_getattr, dict_95ci, dict_median_scores
 
 
@@ -73,6 +73,7 @@ class BC(BaseBootstrap):
     def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc=True):
         Y = self.Y
         violin_title = ""
+
         # OOB
         x_loc_oob_dict = {k: [] for k in range(len(self.Y))}
         for i in range(len(self.bootidx_oob)):
@@ -192,9 +193,38 @@ class BC(BaseBootstrap):
         output_notebook()
         show(fig)
 
-    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, parametric=False, bc=True):
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, parametric=False, bc=True, legend=False, scatter_show=None):
         bootx = 1
         num_x_scores = len(self.stat['model.x_scores_'].T)
+
+        if scatter_show == None:
+            scatter_show = 0
+        elif scatter_show == "None":
+            scatter_show = 0
+        elif scatter_show == "Inner":
+            scatter_show = 1
+        elif scatter_show == "IB":
+            scatter_show = 2
+        elif scatter_show == "OOB":
+            scatter_show = 3
+        elif scatter_show == "All":
+            scatter_show = 4
+        else:
+            raise ValueError("scatter has to be either 'None', 'Inner', 'IB', 'OOB', 'All'")
+
+        # pctvar
+        pctvar_all = []
+        for i in range(len(self.bootidx_oob)):
+            val = self.bootstat_oob['model.pctvar_'][i]
+            pctvar_all.append(val)
+        pctvar_ = np.median(pctvar_all, 0)
+
+        # y_loadings_
+        y_loadings_all = []
+        for i in range(len(self.bootidx_oob)):
+            val = self.bootstat_oob['model.y_loadings_'][i]
+            y_loadings_all.append(val)
+        y_loadings_ = np.median(y_loadings_all, 0)[0]
 
         # OOB
         x_loc_oob_dict = {k: [] for k in range(len(self.Y))}
@@ -245,28 +275,33 @@ class BC(BaseBootstrap):
             # Append each scoreplot
             for i in range(len(comb_x_scores)):
                 # Make a copy (as it overwrites the input label/group)
-                label_copy = deepcopy(label)
-                group_copy = self.Y.copy()
+                if label is None:
+                    group_copy = self.Y.copy()
+                    label_copy = None
+                else:
+                    newlabel = np.array(label)
+                    label_copy = deepcopy(label)
+                    group_copy = deepcopy(newlabel)
 
                 # Scatterplot
                 x, y = comb_x_scores[i]
-                xlabel = "LV {} ({:0.1f}%)".format(x + 1, 10)
-                ylabel = "LV {} ({:0.1f}%)".format(y + 1, 10)
-                gradient = 1
+                xlabel = "LV {} ({:0.1f}%)".format(x + 1, pctvar_[x])
+                ylabel = "LV {} ({:0.1f}%)".format(y + 1, pctvar_[y])
+                gradient = y_loadings_[y] / y_loadings_[x]
 
                 max_range = max(np.max(np.abs(x_scores_full[:, x])), np.max(np.abs(x_scores_cv[:, y])))
                 new_range_min = -max_range - 0.05 * max_range
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
 
-                grid[y, x] = scatter(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True)
+                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
 
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
 
             for i in range(num_x_scores):
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
-                xlabel = "LV {} ({:0.1f}%)".format(i + 1, 10)
+                xlabel = "LV {} ({:0.1f}%)".format(i + 1, pctvar_[i])
                 grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
 
             # Append each roc curve
@@ -274,7 +309,9 @@ class BC(BaseBootstrap):
                 x, y = comb_x_scores[i]
 
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
-                theta = math.atan(1)
+                #theta = math.atan(1)
+                gradient = y_loadings_[y] / y_loadings_[x]
+                theta = math.atan(gradient)
                 x_rotate_stat = self.stat['model.x_scores_'][:, x] * math.cos(theta) + self.stat['model.x_scores_'][:, y] * math.sin(theta)
                 x_rotate_ib = []
                 for i in self.bootstat['model.x_scores_']:
@@ -289,7 +326,7 @@ class BC(BaseBootstrap):
                 # x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 # x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
                 Y = self.Y
-                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, parametric=parametric, bc=bc, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font)
+                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, parametric=parametric, bc=bc, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font)
 
                 # self.x_rotate = x_rotate
                 # self.Y = group_copy
@@ -360,7 +397,19 @@ class BC(BaseBootstrap):
             fig_2 = scatterCI(self.stat['model.vip_'], ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title=name_vip, sort_abs=sort, sort_ci=sort_ci, sort_ci_abs=True)
         else:
             fig_2 = scatterCI(self.stat['model.vip_'], ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=False, title=name_vip, sort_abs=sort, sort_ci_abs=True)
-        fig = layout([[fig_1], [fig_2]])
+
+        ######
+        if self.model.pfi_nperm == 0:
+            fig = layout([[fig_1], [fig_2]])
+        else:
+            ci_pfi_acc_ = self.bootci["model.pfi_acc_"]
+            fig_3 = scatterCI(self.stat['model.pfi_acc_'], ci=ci_pfi_acc_, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Permutation Feature Importance: Accuracy", sort_abs=sort, sort_ci_abs=True)
+            ci_pfi_r2q2_ = self.bootci["model.pfi_r2q2_"]
+            fig_4 = scatterCI(self.stat['model.pfi_r2q2_'], ci=ci_pfi_r2q2_, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Permutation Feature Importance: R²", sort_abs=sort, sort_ci_abs=True)
+            ci_pfi_auc_ = self.bootci["model.pfi_auc_"]
+            fig_5 = scatterCI(self.stat['model.pfi_auc_'], ci=ci_pfi_auc_, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Permutation Feature Importance: AUC", sort_abs=sort, sort_ci_abs=True)
+            fig = layout([[fig_1], [fig_2], [fig_3], [fig_4], [fig_5]])
+
         output_notebook()
         show(fig)
 
@@ -370,20 +419,28 @@ class BC(BaseBootstrap):
         vip = pd.DataFrame([self.stat['model.vip_'], self.bootci["model.vip_"]]).T
         vip.rename(columns={0: "VIP", 1: "VIP-95CI"}, inplace=True)
 
-        if name_vip == "Coefficient Plot":
-            Peaksheet = PeakTable.copy()
-            Peaksheet["Coef"] = coef["Coef"].values
-            Peaksheet["VIP"] = vip["VIP"].values
-            if hasattr(self, "bootci"):
-                Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
-                Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
-        else:
-            Peaksheet = PeakTable.copy()
-            Peaksheet["CW"] = coef["Coef"].values
-            Peaksheet["GA"] = vip["VIP"].values
-            if hasattr(self, "bootci"):
-                Peaksheet["CW-95CI"] = coef["Coef-95CI"].values
-                Peaksheet["GA-95CI"] = vip["VIP-95CI"].values
+        if self.model.pfi_nperm > 0:
+            pfi_acc = pd.DataFrame([self.stat['model.pfi_acc_'], self.bootci["model.pfi_acc_"]]).T
+            pfi_acc.rename(columns={0: "PFI_ACC", 1: "PFI_ACC-95CI"}, inplace=True)
+            pfi_r2 = pd.DataFrame([self.stat['model.pfi_r2q2_'], self.bootci["model.pfi_r2q2_"]]).T
+            pfi_r2.rename(columns={0: "PFI_R2", 1: "PFI_R2-95CI"}, inplace=True)
+            pfi_auc = pd.DataFrame([self.stat['model.pfi_auc_'], self.bootci["model.pfi_auc_"]]).T
+            pfi_auc.rename(columns={0: "PFI_AUC", 1: "PFI_AUC-95CI"}, inplace=True)
+
+        Peaksheet = PeakTable.copy()
+        Peaksheet["Coef"] = coef["Coef"].values
+        Peaksheet["VIP"] = vip["VIP"].values
+        if self.model.pfi_nperm > 0:
+            Peaksheet["PFI_ACC"] = pfi_acc["PFI_ACC"].values
+            Peaksheet["PFI_R2"] = pfi_r2["PFI_R2"].values
+            Peaksheet["PFI_AUC"] = pfi_auc["PFI_AUC"].values
+
+        Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
+        Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
+        if self.model.pfi_nperm > 0:
+            Peaksheet["PFI_ACC-95CI"] = pfi_acc["PFI_ACC-95CI"].values
+            Peaksheet["PFI_R2-95CI"] = pfi_r2["PFI_R2-95CI"].values
+            Peaksheet["PFI_AUC-95CI"] = pfi_auc["PFI_AUC-95CI"].values
 
         return Peaksheet
 

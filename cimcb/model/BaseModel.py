@@ -5,6 +5,7 @@ import scipy
 import collections
 import math
 from tqdm import tqdm
+from copy import deepcopy, copy
 from scipy.stats import logistic
 from itertools import combinations
 from copy import deepcopy, copy
@@ -19,7 +20,7 @@ from sklearn import metrics
 from sklearn.utils import resample
 from ..bootstrap import Perc, BC, BCA
 from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot
-from ..utils import binary_metrics
+from ..utils import binary_metrics, dict_mean, dict_median
 
 
 class BaseModel(ABC):
@@ -150,20 +151,12 @@ class BaseModel(ABC):
             vip = pd.DataFrame([self.model.vip_, self.bootci["model.vip_"]]).T
             vip.rename(columns={0: "VIP", 1: "VIP-95CI"}, inplace=True)
 
-        if name_vip == "Coefficient Plot":
-            Peaksheet = PeakTable.copy()
-            Peaksheet["Coef"] = coef["Coef"].values
-            Peaksheet["VIP"] = vip["VIP"].values
-            if hasattr(self, "bootci"):
-                Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
-                Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
-        else:
-            Peaksheet = PeakTable.copy()
-            Peaksheet["CW"] = coef["Coef"].values
-            Peaksheet["GA"] = vip["VIP"].values
-            if hasattr(self, "bootci"):
-                Peaksheet["CW-95CI"] = coef["Coef-95CI"].values
-                Peaksheet["GA-95CI"] = vip["VIP-95CI"].values
+        Peaksheet = PeakTable.copy()
+        Peaksheet["Coef"] = coef["Coef"].values
+        Peaksheet["VIP"] = vip["VIP"].values
+        if hasattr(self, "bootci"):
+            Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
+            Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
 
         return Peaksheet
 
@@ -1005,3 +998,66 @@ class BaseModel(ABC):
         else:
             raise ValueError("name must end in .xlsx or .csv")
         print("Done! Saved table as {}".format(name))
+
+    def pfi(self, nperm=100, metric="r2q2", mean=True):
+        X = deepcopy(self.X)
+        Y = deepcopy(self.Y)
+        yb = self.test(X)
+        mb_b = binary_metrics(Y, yb)
+        mb_s = []
+        for i in range(len(X.T)):
+            mb_store = []
+            for j in range(nperm):
+                X_shuff = deepcopy(X)
+                np.random.shuffle(X_shuff[i, :])
+                ys = self.test(X_shuff)
+                mb_s_i = binary_metrics(Y, ys)
+                mb_store.append(mb_s_i)
+            if mean is True:
+                mb_mean = dict_mean(mb_store)
+            else:
+                mb_mean = dict_median(mb_store)
+            mb_s.append(mb_mean)
+
+        # Choose metric to plot
+        metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
+        metric_list = np.array(["acc", "aic", "auc", "bic", "f1score", "prec", "r2q2", "sens", "spec", "sse"])
+        metric_idx = np.where(metric_list == metric)[0][0]
+
+        pfi = []
+        for i in mb_s:
+            val_s = i[metric_title[metric_idx]]
+            val_b = mb_b[metric_title[metric_idx]]
+            val = val_b - val_s
+            pfi.append(val)
+
+        pfi = np.array(pfi)
+
+        # return pfi
+
+        # Testing out r2q2, acc, and auc
+        pfi_acc = []
+        for i in mb_s:
+            val_s = i["ACCURACY"]
+            val_b = mb_b["ACCURACY"]
+            val = val_b - val_s
+            pfi_acc.append(val)
+        pfi_acc = np.array(pfi_acc)
+
+        pfi_r2q2 = []
+        for i in mb_s:
+            val_s = i["R²"]
+            val_b = mb_b["R²"]
+            val = val_b - val_s
+            pfi_r2q2.append(val)
+        pfi_r2q2 = np.array(pfi_r2q2)
+
+        pfi_auc = []
+        for i in mb_s:
+            val_s = i["AUC"]
+            val_b = mb_b["AUC"]
+            val = val_b - val_s
+            pfi_auc.append(val)
+        pfi_auc = np.array(pfi_auc)
+
+        return pfi_acc, pfi_r2q2, pfi_auc

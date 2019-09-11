@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from copy import deepcopy, copy
 import timeit
 import time
 import multiprocessing
@@ -65,16 +64,12 @@ class kfold(BaseCrossVal):
         self.x_scores_full = [[] for i in range(len(self.param_list))]
         self.x_scores_cv = [[] for i in range(len(self.param_list))]
         self.loop_mc_numbers = list(range(len(self.param_list))) * self.n_mc
-        self.y_loadings_ = [[] for i in range(len(self.param_list))]
-        self.pctvar_ = [[] for i in range(len(self.param_list))]
         for i in range(len(self.loop_mc)):
             j = self.loop_mc_numbers[i]  # Location to append to
             self.ypred_full[j].append(ypred[i][0])
             self.ypred_cv[j].append(ypred[i][1])
             self.x_scores_full[j].append(ypred[i][2])
             self.x_scores_cv[j].append(ypred[i][3])
-            self.y_loadings_[j].append(ypred[i][4])
-            self.pctvar_[j].append(ypred[i][5])
 
         # Stop timer
         stop = timeit.default_timer()
@@ -130,14 +125,10 @@ class kfold(BaseCrossVal):
         x_scores_full = [None] * len(self.Y)
         if "model.x_scores_" in model_i.bootlist:
             x_scores_full = model_i.model.x_scores_
-        if "model.y_loadings_" in model_i.bootlist:
-            y_loadings_full = model_i.model.y_loadings_
-        if "model.pctvar_" in model_i.bootlist:
-            pctvar_full = model_i.model.pctvar_
         # CV (for each fold)
         ypred_cv_i, x_scores_cv = self._calc_cv_ypred(model_i, self.X, self.Y)
         ypred_cv = ypred_cv_i
-        return [ypred_full, ypred_cv, x_scores_full, x_scores_cv, y_loadings_full, pctvar_full]
+        return [ypred_full, ypred_cv, x_scores_full, x_scores_cv]
 
     def _calc_ypred_loop_epoch(self, i):
         """Core component of calc_ypred."""
@@ -270,20 +261,15 @@ class kfold(BaseCrossVal):
                 std_list.append(std_combined)
 
         self.table = self._format_table(stats_list)  # Transpose, Add headers
-        self.table = self.table.reindex(index=np.sort(self.table.index))
         if self.n_mc > 1:
             self.table_std = self._format_table(std_list)  # Transpose, Add headers
-            self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
         return self.table
 
     def _calc_cv_ypred(self, model_i, X, Y):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
         x_scores_cv_i = [None] * len(Y)
-        try:
-            model_ii = deepcopy(model_i)  # Make a copy of the model
-        except TypeError:
-            model_ii = copy(model_i)
+
         # if Y is one-hot encoded, flatten it for Stratified Kfold
         try:
             if len(Y[0]) > 1:
@@ -299,15 +285,15 @@ class kfold(BaseCrossVal):
                 X_train = X[train, :]
                 Y_train = Y[train]
                 X_test = X[test, :]
-                model_ii.train(X_train, Y_train)
-                ypred_cv_i_j = model_ii.test(X_test)
+                model_i.train(X_train, Y_train)
+                ypred_cv_i_j = model_i.test(X_test)
                 # Return value to y_pred_cv in the correct position # Better way to do this
                 for (idx, val) in zip(test, ypred_cv_i_j):
                     ypred_cv_i[idx] = val.tolist()
 
                 # Calc x_scores_cv is applicable
-                if "model.x_scores_" in model_ii.bootlist:
-                    x_scores_cv_i_j = model_ii.model.x_scores_
+                if "model.x_scores_" in model_i.bootlist:
+                    x_scores_cv_i_j = model_i.model.x_scores_
                     for (idx, val) in zip(test, x_scores_cv_i_j):
                         x_scores_cv_i[idx] = val.tolist()
 

@@ -256,7 +256,7 @@ def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Sp
 
     # Figure: add line
     fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal distribution line")
-    figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="ROC Curve (Full)", source=source)
+    figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="ROC Curve (FULL)", source=source)
     fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111}")]))
 
     # ADD CV
@@ -307,7 +307,7 @@ def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Sp
 
     source2 = ColumnDataSource(data=data2)
 
-    figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.6, legend="ROC Curve (Train)", source=source2)
+    figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.6, legend="ROC Curve (CV)", source=source2)
     fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
 
     # Figure: add 95CI band
@@ -318,7 +318,6 @@ def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Sp
     fig.title.text_font_size = "11pt"
     fig.xaxis.axis_label_text_font_size = label_font_size
     fig.yaxis.axis_label_text_font_size = label_font_size
-    fig.legend.label_text_font = "10pt"
 
     # Extra padding
     fig.min_border_left = 20
@@ -328,7 +327,8 @@ def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Sp
 
     # Edit legend
     fig.legend.location = "bottom_right"
-    fig.legend.label_text_font_size = "10pt"
+    # fig.legend.label_text_font_size = "1pt"
+    # fig.legend.label_text_font = "1pt"
     if legend is False:
         fig.legend.visible = False
 

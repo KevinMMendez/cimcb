@@ -17,9 +17,9 @@ class NN_SigmoidSigmoid(BaseModel):
     """2 Layer linear-logistic neural network using Keras"""
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.pfi_acc_", "model.pfi_r2q2_", "model.pfi_auc_"]  # list of metrics to bootstrap
 
-    def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0):
+    def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True):
         self.n_neurons = n_neurons
         self.verbose = verbose
         self.n_epochs = epochs
@@ -30,6 +30,9 @@ class NN_SigmoidSigmoid(BaseModel):
         self.nesterov = nesterov
         self.momentum = momentum
         self.learning_rate = learning_rate
+        self.pfi_metric = pfi_metric
+        self.pfi_nperm = pfi_nperm
+        self.pfi_mean = pfi_mean
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
 
         self.__name__ = 'cimcb.model.NN_SigmoidSigmoid'
@@ -63,6 +66,8 @@ class NN_SigmoidSigmoid(BaseModel):
         # If batch-size is None:
         if self.batch_size is None:
             self.batch_size = len(X)
+        self.X = X
+        self.Y = Y
 
         self.model = Sequential()
         self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
@@ -108,8 +113,19 @@ class NN_SigmoidSigmoid(BaseModel):
         self.model.x_scores_ = self.model.x_scores_[:, order]
         self.model.x_loadings_ = self.model.x_loadings_[:, order]
         self.model.y_loadings_ = self.model.y_loadings_[order]
-
         self.model.y_loadings_ = self.model.y_loadings_.T
+
+        # Calculate pfi
+        if self.pfi_nperm == 0:
+            self.model.pfi_acc_ = np.zeros((1, len(Y)))
+            self.model.pfi_r2q2_ = np.zeros((1, len(Y)))
+            self.model.pfi_auc_ = np.zeros((1, len(Y)))
+        else:
+            pfi_acc, pfi_r2q2, pfi_auc = self.pfi(nperm=self.pfi_nperm, metric=self.pfi_metric, mean=self.pfi_mean)
+            self.model.pfi_acc_ = pfi_acc
+            self.model.pfi_r2q2_ = pfi_r2q2
+            self.model.pfi_auc_ = pfi_auc
+
         self.Y_pred = y_pred_train
         self.X = X
         self.Y = Y

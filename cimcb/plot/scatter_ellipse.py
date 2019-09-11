@@ -6,7 +6,7 @@ from bokeh.models import Range1d
 from ..utils import ci95_ellipse
 
 
-def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylabel="y", width=600, height=600, legend=True, size=4, shape="circle", font_size="16pt", label_font_size="13pt", col_palette=None, hover_xy=True, gradient=False, gradient_alt=False, hline=False, vline=False, xrange=None, yrange=None, ci95=False, scatterplot=True, extraci95_x=False, extraci95_y=False, extraci95=False):
+def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", xlabel="x", ylabel="y", width=600, height=600, legend=True, size=4, shape="circle", font_size="16pt", label_font_size="13pt", col_palette=None, hover_xy=True, gradient=False, gradient_alt=False, hline=False, vline=False, xrange=None, yrange=None, ci95=False, scatterplot=True, extraci95_x=False, extraci95_y=False, extraci95=False, scattershow=None):
     """Creates a scatterplot using Bokeh.
 
     Required Parameters
@@ -78,7 +78,7 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
     fig = figure(title=title, x_axis_label=xlabel, y_axis_label=ylabel, plot_width=width, plot_height=height, x_range=xrange, y_range=yrange)
 
     # Add to plot
-    if scatterplot is True:
+    if scattershow in [2, 4]:
         if shape is "circle":
             shape = fig.circle("x", "y", size=size, alpha=0.6, color="col", source=source)
         elif shape is "triangle":
@@ -88,6 +88,25 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
 
         shape_hover = HoverTool(renderers=[shape], tooltips=TOOLTIPS)
         fig.add_tools(shape_hover)
+
+    data1 = {"x": x1, "y": y1, "group": group_copy, "col": col}
+    data_label1 = {}
+    for name, val in label_copy.items():
+        data_label1[name] = val
+    data1.update(data_label1)
+    source1 = ColumnDataSource(data=data1)
+
+    # Tool-tip (add everything in label_copy)
+    TOOLTIPS1 = []
+    if hover_xy is True:
+        TOOLTIPS1 = [("x", "@x{1.111}"), ("y", "@y{1.111}")]
+    for name, val in data_label.items():
+        TOOLTIPS1.append((str(name), "@" + str(name)))
+
+    if scattershow in [3, 4]:
+        shape1 = fig.cross("x", "y", size=size * 2, alpha=0.6, color="col", source=source1)
+        shape_hover1 = HoverTool(renderers=[shape1], tooltips=TOOLTIPS1)
+        fig.add_tools(shape_hover1)
 
     if gradient is not False:
         if gradient_alt is False:
@@ -148,15 +167,24 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
             p, outside_p = ci95_ellipse(data_circ_group, type="pop")
 
             # Plot ci95 ellipse outer line
-            fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group[i]))
-            fig.line(p[:, 0], p[:, 1], color=list_color[i], alpha=0.4)
+            if scattershow is 1:
+                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group[i]))
+            else:
+                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group[i]))
+                fig.line(p[:, 0], p[:, 1], color=list_color[i], alpha=0.4)
 
             # Plot ci95 ellipse shade
-            fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
-            fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
+            if scattershow is 1:
+                fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
+            else:
+                fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
+                fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
             fig.x(np.median(m[:, 0]), np.median(m[:, 1]), size=size, alpha=0.6, color=list_color[i], line_width=2)
 
-            maxv = max(np.abs(p).flatten())
+            if scattershow is 1:
+                maxv = max(np.abs(m).flatten())
+            else:
+                maxv = max(np.abs(p).flatten())
             max_val.append(maxv)
 
         if extraci95 is True:
@@ -191,15 +219,24 @@ def scatter(x, y, label=None, group=None, title="Scatter Plot", xlabel="x", ylab
                 p, outside_p = ci95_ellipse(data_circ_group, type="pop")
 
                 # Plot ci95 ellipse outer line
-                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="dashed")
-                fig.line(p[:, 0], p[:, 1], color=list_color[i], alpha=0.4, line_dash="dashed")
+                if scattershow is 1:
+                    fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="dashed")
+                else:
+                    fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="dashed")
+                    fig.line(p[:, 0], p[:, 1], color=list_color[i], alpha=0.4, line_dash="dashed")
 
                 # Plot ci95 ellipse shade
-                fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
-                fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
+                if scattershow is 1:
+                    fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
+                else:
+                    fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
+                    fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
                 fig.x(np.median(m[:, 0]), np.median(m[:, 1]), size=size, alpha=0.6, color=list_color[i], line_width=2)
 
-                maxv = max(np.abs(p).flatten())
+                if scattershow is 1:
+                    maxv = max(np.abs(m).flatten())
+                else:
+                    maxv = max(np.abs(p).flatten())
                 max_val.append(maxv)
 
         max_range = max(max_val)

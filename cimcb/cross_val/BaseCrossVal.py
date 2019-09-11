@@ -14,7 +14,7 @@ from sklearn.model_selection import ParameterGrid
 from sklearn import preprocessing
 from itertools import combinations
 from copy import deepcopy
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot, roc_plot_cv
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot, roc_plot_cv, scatter_ellipse
 from ..utils import color_scale, dict_perc
 
 
@@ -105,55 +105,91 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot_projections(self, param=None, label=None, size=12, scatter2=False):
+    def plot_projections(self, param=None, components=None, label=None, size=12, scatter2=False, legend=False, scatter_show=None):
 
-        x_scores_full = self.x_scores_full[::-1][0][0]
-        x_scores_cv = np.median(self.x_scores_cv[::-1][0], axis=0)
-        x_scores_cvall = np.array(self.x_scores_cv[::-1][0])
+        if scatter_show == None:
+            scatter_show = 0
+        elif scatter_show == "None":
+            scatter_show = 0
+        elif scatter_show == "Inner":
+            scatter_show = 1
+        elif scatter_show == "Full":
+            scatter_show = 2
+        elif scatter_show == "CV":
+            scatter_show = 3
+        elif scatter_show == "All":
+            scatter_show = 4
+        else:
+            raise ValueError("scatter has to be either 'None', 'Inner', 'Full', 'CV', 'All'")
+
+        if param == None:
+            p = -1
+        else:
+            try:
+                p = np.where(np.array(self.param_list) == param)[0][0]
+            except IndexError:
+                p = -1
+
+        x_scores_full = self.x_scores_full[p][0]
+        x_scores_cv = np.median(np.array(self.x_scores_cv[p]), axis=0)
+        x_scores_cvall = np.array(self.x_scores_cv[p])
+        pctvar_ = self.pctvar_[p][0]
+        y_loadings_ = self.y_loadings_[p][0][0]
+
         scatterplot = scatter2
         num_x_scores = len(x_scores_full.T)
         sigmoid = False
+        if components == None:
+            components = np.array(range(num_x_scores)) + 1
+        else:
+            components = np.sort(np.array(components))
+
+        comb_x_scores = list(combinations(np.array(components) - 1, 2))
+
+        for i in components:
+            if i > num_x_scores:
+                raise ValueError("Component {} does not exist.".format(i))
 
         # If there is only 1 x_score, Need to plot x_score vs. peak (as opposided to x_score[i] vs. x_score[j])
         if num_x_scores == 1:
             pass
         else:
-
-            comb_x_scores = list(combinations(range(num_x_scores), 2))
-
             # Width/height of each scoreplot
-            width_height = int(950 / num_x_scores)
-            circle_size_scoreplot = size / num_x_scores
-            label_font = str(13 - num_x_scores) + "pt"
+            width_height = int(950 / len(components))
+            circle_size_scoreplot = size / len(components)
+            label_font = str(13 - len(components)) + "pt"
 
             # Create empty grid
             grid = np.full((num_x_scores, num_x_scores), None)
-
             # Append each scoreplot
             for i in range(len(comb_x_scores)):
                 # Make a copy (as it overwrites the input label/group)
-                label_copy = deepcopy(label)
-                group_copy = self.Y.copy()
+                if label is None:
+                    group_copy = self.Y.copy()
+                    label_copy = None
+                else:
+                    newlabel = np.array(label)
+                    label_copy = deepcopy(label)
+                    group_copy = deepcopy(newlabel)
 
                 # Scatterplot
                 x, y = comb_x_scores[i]
-                xlabel = "LV {} ({:0.1f}%)".format(x + 1, 10)
-                ylabel = "LV {} ({:0.1f}%)".format(y + 1, 10)
-                gradient = 1
-
+                xlabel = "LV {} ({:0.1f}%)".format(x + 1, pctvar_[x])
+                ylabel = "LV {} ({:0.1f}%)".format(y + 1, pctvar_[y])
+                gradient = y_loadings_[y] / y_loadings_[x]
                 max_range = max(np.max(np.abs(x_scores_full[:, x])), np.max(np.abs(x_scores_cv[:, y])))
                 new_range_min = -max_range - 0.05 * max_range
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
 
-                grid[y, x] = scatter(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=False, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True)
-
+                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:,x].tolist(), x_scores_cv[:,y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
 
-            for i in range(num_x_scores):
+            for i in components:
+                i = i - 1
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
-                xlabel = "LV {} ({:0.1f}%)".format(i + 1, 10)
+                xlabel = "LV {} ({:0.1f}%)".format(i + 1, pctvar_[i])
                 grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid)
 
             # Append each roc curve
@@ -161,12 +197,14 @@ class BaseCrossVal(ABC):
                 x, y = comb_x_scores[i]
 
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
-                theta = math.atan(1)
+                #theta = math.atan(1)
+                gradient = y_loadings_[y] / y_loadings_[x]
+                theta = math.atan(gradient)
                 x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
 
                 self.x_rotate = x_rotate
-                self.Y = group_copy
+                group_copy = self.Y.copy()
                 self.x_rotate_boot = []
                 for i in range(len(x_scores_cvall)):
                     x_rot = x_scores_cvall[i][:, x] * math.cos(theta) + x_scores_cvall[i][:, y] * math.sin(theta)
@@ -179,7 +217,7 @@ class BaseCrossVal(ABC):
 
                 # grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
 
-                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font)
+                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())

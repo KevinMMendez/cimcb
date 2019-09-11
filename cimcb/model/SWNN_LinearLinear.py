@@ -258,7 +258,7 @@ def pctvar_calc(X, Y, w1, b1, w2):
 
     pctvar = []
     if len(w2) == 1:
-        y = np.matmul(x2, w2) + b2
+        y = np.matmul(x2, w2)
         r2_i = r2_score(Y, y)
         pctvar.append(r2_i)
     else:
