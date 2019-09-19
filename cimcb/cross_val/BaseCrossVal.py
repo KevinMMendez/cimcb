@@ -225,7 +225,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=False):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -241,7 +241,7 @@ class BaseCrossVal(ABC):
 
         # Plot based on the number of parameters
         if len(self.param_dict2) == 1:
-            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci)
+            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci, ratio=ratio)
         elif len(self.param_dict2) == 2:
             fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat)
         else:
@@ -251,7 +251,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95, ratio=False):
         """Used for plot function if the number of parameters is 1."""
 
         # Get ci
@@ -296,6 +296,13 @@ class BaseCrossVal(ABC):
                 cv_legend = "TEST"
                 full_text = full_text[:-4] + "train"
                 cv_text = full_text[:-5] + "test"
+
+        if ratio is True:
+            diff = 1 - (abs(cv) / abs(full))
+            if metric == "r2q2":
+                diff_text = "1 - (Q² / R²)"
+            else:
+                diff_text = "1 - (" + full_text[:-4] + "cv /" + full_text[:-4] + "full)"
 
         # round full, cv, and diff for hovertool
         full_hover = []
