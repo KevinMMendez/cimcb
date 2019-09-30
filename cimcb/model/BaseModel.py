@@ -19,7 +19,7 @@ from scipy import interp
 from sklearn import metrics
 from sklearn.utils import resample
 from ..bootstrap import Perc, BC, BCA
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_plot, roc_calculate_boot, roc_plot_boot
 from ..utils import binary_metrics, dict_mean, dict_median
 
 
@@ -237,18 +237,6 @@ class BaseModel(ABC):
         #     Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
         #     Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
         # return Peaksheet
-
-    def permutation_test(self, nperm=100):
-        """Plots permutation test figures.
-
-        Parameters
-        ----------
-        nperm : positive integer, (default 100)
-            Number of permutations.
-        """
-        fig = permutation_test(self, self.X, self.Y, nperm=nperm)
-        output_notebook()
-        show(fig)
 
     def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
