@@ -105,7 +105,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot_projections(self, param=None, components=None, label=None, size=12, scatter2=False, legend=False, scatter_show=None):
+    def plot_projections(self, param=None, components=None, label=None, size=12, scatter2=False, legend=False, scatter_show=None, meanfull=True):
 
         if scatter_show == None:
             scatter_show = 0
@@ -130,7 +130,10 @@ class BaseCrossVal(ABC):
             except IndexError:
                 p = -1
 
-        x_scores_full = self.x_scores_full[p][0]
+        if meanfull == False:
+            x_scores_full = self.x_scores_full[p][0]
+        else:
+            x_scores_full = np.median(np.array(self.x_scores_full[p]), axis=0)
         x_scores_cv = np.median(np.array(self.x_scores_cv[p]), axis=0)
         x_scores_cvall = np.array(self.x_scores_cv[p])
         pctvar_ = self.pctvar_[p][0]
@@ -182,7 +185,7 @@ class BaseCrossVal(ABC):
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
 
-                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:,x].tolist(), x_scores_cv[:,y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
+                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
 
