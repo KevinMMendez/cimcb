@@ -8,6 +8,7 @@ from bokeh.plotting import output_notebook, show
 from bokeh.layouts import gridplot
 from bokeh.plotting import ColumnDataSource, figure
 from .BaseModel import BaseModel
+from ..plot import permutation_test
 from ..plot import scatter, distribution, roc_calculate, roc_plot, boxplot
 
 
@@ -109,6 +110,21 @@ class PLS_SIMPLS(BaseModel):
         self.Y = Y
         self.Y_pred = y_pred_train
         return y_pred_train
+
+    def permutation_test(self, metric='r2q2', nperm=100, folds=5):
+        """Plots permutation test figures.
+
+        Parameters
+        ----------
+        nperm : positive integer, (default 100)
+            Number of permutations.
+        """
+        params = self.__params__
+        perm = permutation_test(PLS_SIMPLS, params, self.X, self.Y, nperm=nperm, folds=folds)
+        perm.run()
+        fig = perm.plot(metric=metric)
+        output_notebook()
+        show(fig)
 
     def test(self, X):
         """Calculate and return Y predicted value.

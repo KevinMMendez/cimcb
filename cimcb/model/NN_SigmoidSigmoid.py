@@ -6,9 +6,11 @@ from keras.layers import Dense
 import tensorflow as tf
 from scipy.stats import logistic
 from copy import deepcopy, copy
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, explained_variance_score
 from keras import backend as K
+from bokeh.plotting import output_notebook, show
 from keras.constraints import max_norm, non_neg, min_max_norm, unit_norm
+from ..plot import permutation_test
 from .BaseModel import BaseModel
 from ..utils import YpredCallback
 
@@ -114,6 +116,7 @@ class NN_SigmoidSigmoid(BaseModel):
         self.model.x_loadings_ = self.model.x_loadings_[:, order]
         self.model.y_loadings_ = self.model.y_loadings_[order]
         self.model.y_loadings_ = self.model.y_loadings_.T
+        self.model.pctvar_ = self.model.pctvar_[order]
 
         # Calculate pfi
         if self.pfi_nperm == 0:
@@ -158,6 +161,21 @@ class NN_SigmoidSigmoid(BaseModel):
 
         return y_pred_test
 
+    def permutation_test(self, metric='r2q2', nperm=100, folds=5):
+        """Plots permutation test figures.
+
+        Parameters
+        ----------
+        nperm : positive integer, (default 100)
+            Number of permutations.
+        """
+        params = self.__params__
+        perm = permutation_test(NN_SigmoidSigmoid, params, self.X, self.Y, nperm=nperm, folds=folds)
+        perm.run()
+        fig = perm.plot(metric=metric)
+        output_notebook()
+        show(fig)
+
 
 def pctvar_calc(model, X, Y):
     x1 = X
@@ -171,17 +189,21 @@ def pctvar_calc(model, X, Y):
     pctvar = []
     if len(w2) == 1:
         y = logistic.cdf(np.matmul(x2, w2) + b2)
-        r2_i = r2_score(Y, y)
+        #r2_i = r2_score(Y, y) * 100
+        r2_i = explained_variance_score(Y, y) * 100
         pctvar.append(r2_i)
     else:
         for i in range(len(w2)):
             w2_i = deepcopy(w2)
             w2_i[~i] = 0
             y = logistic.cdf(np.matmul(x2, w2_i) + b2)
-            r2_i = r2_score(Y, y)
+            #r2_i = r2_score(Y, y) * 100
+            r2_i = explained_variance_score(Y, y) * 100
             pctvar.append(r2_i)
 
     pct = np.array(pctvar)
+    # convert to reltive explained variance
+    pct = pct / np.sum(pct) * 100
     return pct
 
 
