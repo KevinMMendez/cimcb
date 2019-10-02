@@ -8,7 +8,7 @@ def readme():
 
 setup(
     name="cimcb",
-    version="2.0.7",
+    version="2.0.8",
     description="A package containing the necessary tools for the statistical analysis of untargeted and targeted metabolomics data.",
     long_description=readme(),
     long_description_content_type='text/markdown',
@@ -17,7 +17,7 @@ setup(
     packages=["cimcb", "cimcb.bootstrap", "cimcb.cross_val", "cimcb.model", "cimcb.plot", "cimcb.utils"],
     python_requires=">=3.5",
     install_requires=["bokeh>=1.0.0",
-                      "keras",
+                      "keras>=2.2.4",
                       "numpy>=1.12",
                       "pandas",
                       "scipy",
