@@ -1,6 +1,6 @@
 package:
   name: cimcb
-  version: 2.0.7
+  version: 2.0.8
 
 source:
   path: ../
@@ -15,7 +15,7 @@ requirements:
     - setuptools
     - python >=3.5
     - bokeh >=1.0.0
-    - keras
+    - keras >=2.2.4
     - numpy >=1.12
     - pandas
     - scipy
@@ -31,7 +31,7 @@ requirements:
   run:
     - python >=3.5
     - bokeh >=1.0.0
-    - keras
+    - keras >=2.2.4
     - numpy >=1.12
     - pandas
     - scipy
