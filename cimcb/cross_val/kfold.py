@@ -280,10 +280,11 @@ class kfold(BaseCrossVal):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
         x_scores_cv_i = [None] * len(Y)
-        try:
-            model_ii = deepcopy(model_i)  # Make a copy of the model
-        except TypeError:
-            model_ii = copy(model_i)
+        model_ii = model_i
+#         try:
+#             model_ii = deepcopy(model_i)  # Make a copy of the model
+#         except TypeError:
+#             model_ii = copy(model_i)
         # if Y is one-hot encoded, flatten it for Stratified Kfold
         try:
             if len(Y[0]) > 1:
