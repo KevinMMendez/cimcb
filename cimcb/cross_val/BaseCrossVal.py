@@ -228,7 +228,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=False):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=True):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -246,7 +246,7 @@ class BaseCrossVal(ABC):
         if len(self.param_dict2) == 1:
             fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci, ratio=ratio)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, ratio=ratio)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
@@ -254,7 +254,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95, ratio=False):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95, ratio=True):
         """Used for plot function if the number of parameters is 1."""
 
         # Get ci
@@ -478,7 +478,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=True):
 
         # legend always None
         legend = None
@@ -522,7 +522,7 @@ class BaseCrossVal(ABC):
             diff_heat_title = "1 - " + full_title[:-4] + "diff"
             diff_heat_score = 1 - diff_score
         y_axis_text = full_title[:-4]
-
+        
         if metric is "r2q2":
             full_title = 'R²'
             cv_title = 'Q²'
@@ -532,7 +532,15 @@ class BaseCrossVal(ABC):
             else:
                 diff_heat_title = "1  -   | R² - Q² |"
             y_axis_text = "R² & Q²"
-
+        
+        if ratio is True:
+            diff_score = 1 - (abs(cv_score) / abs(full_score))
+            diff_heat_score = 1 - (abs(cv_score) / abs(full_score))
+            if metric == "r2q2":
+                diff_text = "1 - (Q² / R²)"
+            else:
+                diff_text = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
+                
         if model == "kfold":
             full_legend = "FULL"
             cv_legend = "CV"
