@@ -301,11 +301,11 @@ class BaseCrossVal(ABC):
                 cv_text = full_text[:-5] + "test"
 
         if ratio is True:
-            diff = 1 - abs(cv / full)
+            diff = abs(1 - (cv / full))
             if metric == "r2q2":
-                diff_text = "1 - (Q² / R²)"
+                diff_text = "| 1 - (Q² / R²) |"
             else:
-                diff_text = "1 - (" + full_text[:-4] + "cv /" + full_text[:-4] + "full)"
+                diff_text = "| 1 - (" + full_text[:-4] + "cv /" + full_text[:-4] + "full) |"
 
         # round full, cv, and diff for hovertool
         full_hover = []
@@ -534,14 +534,14 @@ class BaseCrossVal(ABC):
             y_axis_text = "R² & Q²"
         
         if ratio is True:
-            diff_score = 1 - abs(cv_score / full_score)
+            diff_score = abs(1 - (cv_score / full_score))
             diff_heat_score = abs(cv_score / full_score)
             if metric == "r2q2":
-                diff_title = "1 - (Q² / R²)"
-                diff_heat_title = "Q² / R²"
+                diff_title = "| 1 - (Q² / R²) |"
+                diff_heat_title = "| Q² / R² |"
             else:
                 diff_title = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
-                diff_heat_title = full_title[:-4] + "cv /" + full_title[:-4] + "full"
+                diff_heat_title = "| " + full_title[:-4] + "cv /" + full_title[:-4] + "full" + " |" 
                 
         if model == "kfold":
             full_legend = "FULL"
