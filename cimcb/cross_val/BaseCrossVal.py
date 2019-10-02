@@ -534,8 +534,8 @@ class BaseCrossVal(ABC):
             y_axis_text = "R² & Q²"
         
         if ratio is True:
-            diff_score = 1 - abs(cv / full)
-            diff_heat_score = abs(cv / full)
+            diff_score = 1 - abs(cv_score / full_score)
+            diff_heat_score = abs(cv_score / full_score)
             if metric == "r2q2":
                 diff_title = "1 - (Q² / R²)"
                 diff_heat_title = "Q² / R²"
