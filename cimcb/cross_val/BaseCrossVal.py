@@ -537,9 +537,11 @@ class BaseCrossVal(ABC):
             diff_score = 1 - (abs(cv_score) / abs(full_score))
             diff_heat_score = 1 - (abs(cv_score) / abs(full_score))
             if metric == "r2q2":
-                diff_text = "1 - (Q² / R²)"
+                diff_title = "1 - (Q² / R²)"
+                diff_heat_title = "1 - (Q² / R²)"
             else:
-                diff_text = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
+                diff_title = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
+                diff_heat_title = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
                 
         if model == "kfold":
             full_legend = "FULL"
