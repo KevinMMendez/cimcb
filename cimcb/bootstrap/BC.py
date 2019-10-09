@@ -70,7 +70,7 @@ class BC(BaseBootstrap):
         self.calc_bootstat()
         self.calc_bootci()
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc=True):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric'):
         Y = self.Y
         violin_title = ""
 
@@ -193,7 +193,7 @@ class BC(BaseBootstrap):
         output_notebook()
         show(fig)
 
-    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, parametric=False, bc=True, legend=False, scatter_show=None):
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend=False, scatter_show=None):
         bootx = 1
         num_x_scores = len(self.stat['model.x_scores_'].T)
 
@@ -326,7 +326,7 @@ class BC(BaseBootstrap):
                 # x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 # x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
                 Y = self.Y
-                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, parametric=parametric, bc=bc, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font)
+                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, parametric=parametric, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font,  parametric=bc, bc=True)
 
                 # self.x_rotate = x_rotate
                 # self.Y = group_copy
