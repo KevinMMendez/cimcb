@@ -133,7 +133,7 @@ class BC(BaseBootstrap):
         # Distribution plot
         dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt", smooth=dist_smooth)
 
-        roc_bokeh = roc_plot_boot2(ypred_ib, ypred_oob, Y, self.bootstat['Y_pred'], self.bootidx, self.bootstat_oob['Y_pred'], self.bootidx_oob, self.stat['Y_pred'], width=320, height=315, label_font_size="10pt", parametric=parametric, bc=bc)
+        roc_bokeh = roc_plot_boot2(ypred_ib, ypred_oob, Y, self.bootstat['Y_pred'], self.bootidx, self.bootstat_oob['Y_pred'], self.bootidx_oob, self.stat['Y_pred'], width=320, height=315, label_font_size="10pt", parametric=bc, bc=True)
 
         fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh]])
         output_notebook()
