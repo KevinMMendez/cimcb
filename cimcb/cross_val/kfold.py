@@ -280,11 +280,10 @@ class kfold(BaseCrossVal):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
         x_scores_cv_i = [None] * len(Y)
-        model_ii = model_i
-#         try:
-#             model_ii = deepcopy(model_i)  # Make a copy of the model
-#         except TypeError:
-#             model_ii = copy(model_i)
+        try:
+            model_ii = deepcopy(model_i)  # Make a copy of the model
+        except TypeError:
+            model_ii = copy(model_i)
         # if Y is one-hot encoded, flatten it for Stratified Kfold
         try:
             if len(Y[0]) > 1:
@@ -332,5 +331,5 @@ class kfold(BaseCrossVal):
 
         return ypred_cv_i, x_scores_cv_i
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=True):
-        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, ratio=ratio)
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, method='ratio', style=1, alt=True):
+        super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, style=style, method=method, alt=alt)

@@ -200,7 +200,7 @@ class BaseCrossVal(ABC):
                 x, y = comb_x_scores[i]
 
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
-                #theta = math.atan(1)
+                # theta = math.atan(1)
                 gradient = y_loadings_[y] / y_loadings_[x]
                 theta = math.atan(gradient)
                 x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
@@ -228,7 +228,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=True):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -244,9 +244,9 @@ class BaseCrossVal(ABC):
 
         # Plot based on the number of parameters
         if len(self.param_dict2) == 1:
-            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci, ratio=ratio)
+            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci, method=method, style=style, alt=alt)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, ratio=ratio)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, style=style, method=method, alt=alt)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
@@ -254,7 +254,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95, ratio=True):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95, method='ratio', style=0, alt=True):
         """Used for plot function if the number of parameters is 1."""
 
         # Get ci
@@ -300,12 +300,18 @@ class BaseCrossVal(ABC):
                 full_text = full_text[:-4] + "train"
                 cv_text = full_text[:-5] + "test"
 
-        if ratio is True:
+        if method is 'ratio':
             diff = abs(1 - (cv / full))
             if metric == "r2q2":
-                diff_text = "| 1 - (Q² / R²) |"
+                diff_text = "1 - (Q² / R²)"
             else:
-                diff_text = "| 1 - (" + full_text[:-4] + "cv /" + full_text[:-4] + "full) |"
+                diff_text = "1 - (" + full_text[:-4] + "cv /" + full_text[:-4] + "full)"
+            if alt is True:
+                diff = abs((full - cv) / full)
+                if metric == "r2q2":
+                    diff_text = "| (R² - Q²) / R² |"
+                else:
+                    diff_text = "| (" + full_text[:-4] + "full - " + full_text[:-4] + "cv) / " + full_text[:-4] + "full |"
 
         # round full, cv, and diff for hovertool
         full_hover = []
@@ -391,45 +397,89 @@ class BaseCrossVal(ABC):
         fig2_title = y_axis_text + " over " + key_title
         fig2 = figure(x_axis_label=key_xaxis, y_axis_label=y_axis_text, title=fig2_title, plot_width=width, plot_height=height, x_range=pd.unique(values_string), tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select")
 
-        # Figure 2: Add Confidence Intervals if n_mc > 1
-        if self.n_mc > 1:
-            # get full, cv, and diff
-            full_std = self.table_std.iloc[2 * metric_idx + 1]
-            cv_std = self.table_std.iloc[2 * metric_idx]
-            lower_ci_full = pd.Series(name=full_std.name, dtype="object")
-            upper_ci_full = pd.Series(name=full_std.name, dtype="object")
-            for key, values in full_std.iteritems():
-                lower_ci_full[key] = values[0]
-                upper_ci_full[key] = values[1]
-            lower_ci_cv = pd.Series(name=cv_std.name, dtype="object")
-            upper_ci_cv = pd.Series(name=cv_std.name, dtype="object")
-            for key, values in cv_std.iteritems():
-                lower_ci_cv[key] = values[0]
-                upper_ci_cv[key] = values[1]
-            # Plot as a patch
-            x_patch = np.hstack((values_string, values_string[::-1]))
-            y_patch_r2 = np.hstack((lower_ci_full, upper_ci_full[::-1]))
-            y_patch_q2 = np.hstack((lower_ci_cv, upper_ci_cv[::-1]))
-            fig2.patch(x_patch, y_patch_q2, alpha=0.10, color="blue")
-            # kfold monte-carlo does not have ci for R2
-            if model is not "kfold":
-                fig2.patch(x_patch, y_patch_r2, alpha=0.10, color="red")
+        if style == 0:
+            # Figure 2: Add Confidence Intervals if n_mc > 1
+            if self.n_mc > 1:
+                # get full, cv, and diff
+                full_std = self.table_std.iloc[2 * metric_idx + 1]
+                cv_std = self.table_std.iloc[2 * metric_idx]
+                lower_ci_full = pd.Series(name=full_std.name, dtype="object")
+                upper_ci_full = pd.Series(name=full_std.name, dtype="object")
+                for key, values in full_std.iteritems():
+                    lower_ci_full[key] = values[0]
+                    upper_ci_full[key] = values[1]
+                lower_ci_cv = pd.Series(name=cv_std.name, dtype="object")
+                upper_ci_cv = pd.Series(name=cv_std.name, dtype="object")
+                for key, values in cv_std.iteritems():
+                    lower_ci_cv[key] = values[0]
+                    upper_ci_cv[key] = values[1]
+                # Plot as a patch
+                x_patch = np.hstack((values_string, values_string[::-1]))
+                y_patch_r2 = np.hstack((lower_ci_full, upper_ci_full[::-1]))
+                y_patch_q2 = np.hstack((lower_ci_cv, upper_ci_cv[::-1]))
+                fig2.patch(x_patch, y_patch_q2, alpha=0.10, color="blue")
+                # kfold monte-carlo does not have ci for R2
+                if model is not "kfold":
+                    fig2.patch(x_patch, y_patch_r2, alpha=0.10, color="red")
 
-        # Figure 2: add full
-        fig2_line_full = fig2.line(values_string, full, line_color="red", line_width=2)
-        fig2_circ_full = fig2.circle("values_string", "full", line_color="red", fill_color="white", fill_alpha=1, size=8, source=source, legend=full_legend)
-        fig2_circ_full.selection_glyph = Circle(line_color="red", fill_color="white", line_width=2)
-        fig2_circ_full.nonselection_glyph.line_color = "red"
-        fig2_circ_full.nonselection_glyph.fill_color = "white"
-        fig2_circ_full.nonselection_glyph.line_alpha = 0.4
+            # Figure 2: add full
+            fig2_line_full = fig2.line(values_string, full, line_color="red", line_width=2)
+            fig2_circ_full = fig2.circle("values_string", "full", line_color="red", fill_color="white", fill_alpha=1, size=8, source=source, legend=full_legend)
+            fig2_circ_full.selection_glyph = Circle(line_color="red", fill_color="white", line_width=2)
+            fig2_circ_full.nonselection_glyph.line_color = "red"
+            fig2_circ_full.nonselection_glyph.fill_color = "white"
+            fig2_circ_full.nonselection_glyph.line_alpha = 0.4
 
-        # Figure 2: add cv
-        fig2_line_cv = fig2.line(values_string, cv, line_color="blue", line_width=2)
-        fig2_circ_cv = fig2.circle("values_string", "cv", line_color="blue", fill_color="white", fill_alpha=1, size=8, source=source, legend=cv_legend)
-        fig2_circ_cv.selection_glyph = Circle(line_color="blue", fill_color="white", line_width=2)
-        fig2_circ_cv.nonselection_glyph.line_color = "blue"
-        fig2_circ_cv.nonselection_glyph.fill_color = "white"
-        fig2_circ_cv.nonselection_glyph.line_alpha = 0.4
+            # Figure 2: add cv
+            fig2_line_cv = fig2.line(values_string, cv, line_color="blue", line_width=2)
+            fig2_circ_cv = fig2.circle("values_string", "cv", line_color="blue", fill_color="white", fill_alpha=1, size=8, source=source, legend=cv_legend)
+            fig2_circ_cv.selection_glyph = Circle(line_color="blue", fill_color="white", line_width=2)
+            fig2_circ_cv.nonselection_glyph.line_color = "blue"
+            fig2_circ_cv.nonselection_glyph.fill_color = "white"
+            fig2_circ_cv.nonselection_glyph.line_alpha = 0.4
+
+        elif style == 1:
+            # Figure 2: Add Confidence Intervals if n_mc > 1
+            if self.n_mc > 1:
+                # get full, cv, and diff
+                full_std = self.table_std.iloc[2 * metric_idx + 1]
+                cv_std = self.table_std.iloc[2 * metric_idx]
+                lower_ci_full = pd.Series(name=full_std.name, dtype="object")
+                upper_ci_full = pd.Series(name=full_std.name, dtype="object")
+                for key, values in full_std.iteritems():
+                    lower_ci_full[key] = values[0]
+                    upper_ci_full[key] = values[1]
+                lower_ci_cv = pd.Series(name=cv_std.name, dtype="object")
+                upper_ci_cv = pd.Series(name=cv_std.name, dtype="object")
+                for key, values in cv_std.iteritems():
+                    lower_ci_cv[key] = values[0]
+                    upper_ci_cv[key] = values[1]
+                # Plot as a patch
+                x_patch = np.hstack((values_string, values_string[::-1]))
+                y_patch_r2 = np.hstack((lower_ci_full, upper_ci_full[::-1]))
+                y_patch_q2 = np.hstack((lower_ci_cv, upper_ci_cv[::-1]))
+                fig2.patch(x_patch, y_patch_q2, alpha=0.10, color="green")
+                # kfold monte-carlo does not have ci for R2
+                if model is not "kfold":
+                    fig2.patch(x_patch, y_patch_r2, alpha=0.10, color="green")
+
+            # Figure 2: add full
+            fig2_line_full = fig2.line(values_string, full, line_color="green", line_width=2, legend=full_legend)
+            fig2_circ_full = fig2.circle("values_string", "full", line_color="green", fill_color="white", fill_alpha=1, size=8, source=source)
+            fig2_circ_full.selection_glyph = Circle(line_color="green", fill_color="white", line_width=2)
+            fig2_circ_full.nonselection_glyph.line_color = "green"
+            fig2_circ_full.nonselection_glyph.fill_color = "white"
+            fig2_circ_full.nonselection_glyph.line_alpha = 0.4
+
+            # Figure 2: add cv
+            fig2_line_cv = fig2.line(values_string, cv, line_color="green", line_width=2, line_dash='dashed', legend=cv_legend)
+            fig2_circ_cv = fig2.circle("values_string", "cv", line_color="green", fill_color="white", fill_alpha=1, size=8, source=source)
+            fig2_circ_cv.selection_glyph = Circle(line_color="green", fill_color="white", line_width=2)
+            fig2_circ_cv.nonselection_glyph.line_color = "green"
+            fig2_circ_cv.nonselection_glyph.fill_color = "white"
+            fig2_circ_cv.nonselection_glyph.line_alpha = 0.4
+        else:
+            raise ValueError("Style needs to be 0 or 1.")
 
         # Add hovertool and taptool
         fig2.add_tools(HoverTool(renderers=[fig2_circ_full], tooltips=[(full_text, "@full_hover")], mode="vline"))
@@ -478,7 +528,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, ratio=True):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
 
         # legend always None
         legend = None
@@ -488,6 +538,9 @@ class BaseCrossVal(ABC):
             raise ValueError("color_beta needs to be a list of 3 values e.g. [10, 10, 10]")
         if len(color_beta) != 3:
             raise ValueError("color_beta needs to be a list of 3 values e.g. [10, 10, 10]")
+
+        if method is 'ratio':
+            color_beta[2] = color_beta[2] / 10
 
         # Get ci
         if self.n_mc > 1:
@@ -522,7 +575,7 @@ class BaseCrossVal(ABC):
             diff_heat_title = "1 - " + full_title[:-4] + "diff"
             diff_heat_score = 1 - diff_score
         y_axis_text = full_title[:-4]
-        
+
         if metric is "r2q2":
             full_title = 'R²'
             cv_title = 'Q²'
@@ -532,17 +585,30 @@ class BaseCrossVal(ABC):
             else:
                 diff_heat_title = "1  -   | R² - Q² |"
             y_axis_text = "R² & Q²"
-        
-        if ratio is True:
+
+        if method is 'ratio':
             diff_score = abs(1 - (cv_score / full_score))
             diff_heat_score = abs(cv_score / full_score)
             if metric == "r2q2":
                 diff_title = "| 1 - (Q² / R²) |"
                 diff_heat_title = "| Q² / R² |"
             else:
-                diff_title = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
-                diff_heat_title = "| " + full_title[:-4] + "cv /" + full_title[:-4] + "full" + " |" 
-                
+                diff_title = "| 1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full) |"
+                diff_heat_title = "| " + full_title[:-4] + "cv /" + full_title[:-4] + "full" + " |"
+
+            if alt is True:
+                diff_score = abs((full_score - cv_score) / full_score)
+                diff_heat_score = abs((full_score - cv_score) / full_score)
+                if metric == "r2q2":
+                    #diff_title = "| 1 - (Q² / R²) |"
+                    diff_title = "| (R² - Q²) / R² |"
+                    diff_heat_title = "| (R² - Q²) / R² |"
+                else:
+                    #diff_title = "1 - (" + full_title[:-4] + "cv /" + full_title[:-4] + "full)"
+                    diff_title = "| (" + full_title[:-4] + "full - " + full_title[:-4] + "cv) / " + full_title[:-4] + "full |"
+                    #diff_heat_title = "| " + full_title[:-4] + "cv /" + full_title[:-4] + "full" + " |"
+                    diff_heat_title = diff_title = "| (" + full_title[:-4] + "full - " + full_title[:-4] + "cv) / " + full_title[:-4] + "full |"
+
         if model == "kfold":
             full_legend = "FULL"
             cv_legend = "CV"
@@ -924,7 +990,7 @@ class BaseCrossVal(ABC):
         p4.axis.major_label_text_font_size = str(8 * scale) + "pt"
         p4.xaxis.axis_label_text_font_size = str(12 * scale) + "pt"
         p4.yaxis.axis_label_text_font_size = str(12 * scale) + "pt"
-        p4.title.text_font_size = str(14 * scale) + "pt"
+        p4.title.text_font_size = str(12 * scale) + "pt"
 
         # Line plot 1
         l1_range_special = []
@@ -950,40 +1016,76 @@ class BaseCrossVal(ABC):
         p5.quad(top=[1000], bottom=[-1000], left=[l1_xrange[-1]], right=[1000], color="white")
 
         # p5.outline_line_color = "white"
-        if self.n_mc > 1:
-            p5_render_patch2 = p5.patches("monte_line_key0_value", "monte_line1_cv", alpha=0, color="blue", source=source)
-            p5_render_patch2.selection_glyph = Patches(fill_alpha=0.2, fill_color="blue", line_color="white")
-            p5_render_patch2.nonselection_glyph.fill_alpha = 0
-            p5_render_patch2.nonselection_glyph.line_color = "white"
-            # kfold monte-carlo does not have ci for R2
-            if model is not "kfold":
-                p5_render_patch1 = p5.patches("monte_line_key0_value", "monte_line1_full", alpha=0, color="red", source=source)
-                p5_render_patch1.selection_glyph = Patches(fill_alpha=0.2, fill_color="red", line_color="white")
-                p5_render_patch1.nonselection_glyph.fill_alpha = 0
-                p5_render_patch1.nonselection_glyph.line_color = "white"
+        if style == 0:
+            if self.n_mc > 1:
+                p5_render_patch2 = p5.patches("monte_line_key0_value", "monte_line1_cv", alpha=0, color="blue", source=source)
+                p5_render_patch2.selection_glyph = Patches(fill_alpha=0.2, fill_color="blue", line_color="white")
+                p5_render_patch2.nonselection_glyph.fill_alpha = 0
+                p5_render_patch2.nonselection_glyph.line_color = "white"
+                # kfold monte-carlo does not have ci for R2
+                if model is not "kfold":
+                    p5_render_patch1 = p5.patches("monte_line_key0_value", "monte_line1_full", alpha=0, color="red", source=source)
+                    p5_render_patch1.selection_glyph = Patches(fill_alpha=0.2, fill_color="red", line_color="white")
+                    p5_render_patch1.nonselection_glyph.fill_alpha = 0
+                    p5_render_patch1.nonselection_glyph.line_color = "white"
 
-        p5_render_1 = p5.multi_line("line_key0_value", "line1_full", line_color="red", line_width=2 * scale, source=source)
-        p5_render_1.selection_glyph = MultiLine(line_color="red", line_alpha=0.8, line_width=2 * scale)
-        p5_render_1.nonselection_glyph.line_color = "red"
-        p5_render_1.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
+            p5_render_1 = p5.multi_line("line_key0_value", "line1_full", line_color="red", line_width=2 * scale, source=source)
+            p5_render_1.selection_glyph = MultiLine(line_color="red", line_alpha=0.8, line_width=2 * scale)
+            p5_render_1.nonselection_glyph.line_color = "red"
+            p5_render_1.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
 
-        p5_render_2 = p5.circle("key1_value", "full_score", line_color="red", fill_color="white", size=8 * scale, source=source, legend=full_legend)
-        p5_render_2.selection_glyph = Circle(line_color="red", fill_color="white")
-        p5_render_2.nonselection_glyph.line_color = "red"
-        p5_render_2.nonselection_glyph.fill_color = "white"
-        p5_render_2.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
+            p5_render_2 = p5.circle("key1_value", "full_score", line_color="red", fill_color="white", size=8 * scale, source=source, legend=full_legend)
+            p5_render_2.selection_glyph = Circle(line_color="red", fill_color="white")
+            p5_render_2.nonselection_glyph.line_color = "red"
+            p5_render_2.nonselection_glyph.fill_color = "white"
+            p5_render_2.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
 
-        p5_render_3 = p5.multi_line("line_key0_value", "line1_cv", line_color="blue", line_width=2 * scale, source=source)
-        p5_render_3.selection_glyph = MultiLine(line_color="blue", line_alpha=0.8, line_width=2 * scale)
-        p5_render_3.nonselection_glyph.line_color = "blue"
-        p5_render_3.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
+            p5_render_3 = p5.multi_line("line_key0_value", "line1_cv", line_color="blue", line_width=2 * scale, source=source)
+            p5_render_3.selection_glyph = MultiLine(line_color="blue", line_alpha=0.8, line_width=2 * scale)
+            p5_render_3.nonselection_glyph.line_color = "blue"
+            p5_render_3.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
 
-        p5_render_4 = p5.circle("key1_value", "cv_score", line_color="blue", fill_color="white", size=8 * scale, source=source, legend=cv_legend)
-        p5_render_4.selection_glyph = Circle(line_color="blue", fill_color="white")
-        p5_render_4.nonselection_glyph.line_color = "blue"
-        p5_render_4.nonselection_glyph.fill_color = "white"
-        p5_render_4.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
+            p5_render_4 = p5.circle("key1_value", "cv_score", line_color="blue", fill_color="white", size=8 * scale, source=source, legend=cv_legend)
+            p5_render_4.selection_glyph = Circle(line_color="blue", fill_color="white")
+            p5_render_4.nonselection_glyph.line_color = "blue"
+            p5_render_4.nonselection_glyph.fill_color = "white"
+            p5_render_4.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
+        elif style == 1:
+            if self.n_mc > 1:
+                p5_render_patch2 = p5.patches("monte_line_key0_value", "monte_line1_cv", alpha=0, color="green", source=source)
+                p5_render_patch2.selection_glyph = Patches(fill_alpha=0.2, fill_color="green", line_color="white")
+                p5_render_patch2.nonselection_glyph.fill_alpha = 0
+                p5_render_patch2.nonselection_glyph.line_color = "white"
+                # kfold monte-carlo does not have ci for R2
+                if model is not "kfold":
+                    p5_render_patch1 = p5.patches("monte_line_key0_value", "monte_line1_full", alpha=0, color="green", source=source)
+                    p5_render_patch1.selection_glyph = Patches(fill_alpha=0.2, fill_color="green", line_color="white")
+                    p5_render_patch1.nonselection_glyph.fill_alpha = 0
+                    p5_render_patch1.nonselection_glyph.line_color = "white"
 
+            p5_render_1 = p5.multi_line("line_key0_value", "line1_full", line_color="green", line_width=2 * scale, source=source, legend=full_legend)
+            p5_render_1.selection_glyph = MultiLine(line_color="green", line_alpha=0.8, line_width=2 * scale)
+            p5_render_1.nonselection_glyph.line_color = "green"
+            p5_render_1.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
+
+            p5_render_2 = p5.circle("key1_value", "full_score", line_color="green", fill_color="white", size=8 * scale, source=source)
+            p5_render_2.selection_glyph = Circle(line_color="green", fill_color="white")
+            p5_render_2.nonselection_glyph.line_color = "green"
+            p5_render_2.nonselection_glyph.fill_color = "white"
+            p5_render_2.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
+
+            p5_render_3 = p5.multi_line("line_key0_value", "line1_cv", line_color="green", line_dash="dashed", line_width=2 * scale, source=source, legend=full_legend)
+            p5_render_3.selection_glyph = MultiLine(line_color="green", line_alpha=0.8, line_width=2 * scale, line_dash="dashed")
+            p5_render_3.nonselection_glyph.line_color = "green"
+            p5_render_3.nonselection_glyph.line_alpha = 0.05 / len(key1_unique)
+
+            p5_render_4 = p5.circle("key1_value", "cv_score", line_color="green", fill_color="white", size=8 * scale, source=source)
+            p5_render_4.selection_glyph = Circle(line_color="green", fill_color="white")
+            p5_render_4.nonselection_glyph.line_color = "green"
+            p5_render_4.nonselection_glyph.fill_color = "white"
+            p5_render_4.nonselection_glyph.line_alpha = 0.7 / len(key1_unique)
+        else:
+            raise ValueError("Style needs to be 0 or 1.")
         # text
         text_here = 8 * scale
         text_line_font = str(text_here) + "pt"
@@ -1024,39 +1126,74 @@ class BaseCrossVal(ABC):
         p6 = figure(title=l2_title, x_axis_label=param_keys_axis[1], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l2_xrange2, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
         p6.quad(top=[1000], bottom=[-1000], left=[l2_xrange[-1]], right=[1000], color="white")
 
-        if self.n_mc > 1:
-            p6_render_patch2 = p6.patches("monte_line_key1_value", "monte_line0_cv", alpha=0, color="blue", source=source)
-            p6_render_patch2.selection_glyph = Patches(fill_alpha=0.1, fill_color="blue", line_color="white")
-            p6_render_patch2.nonselection_glyph.fill_alpha = 0
-            p6_render_patch2.nonselection_glyph.line_color = "white"
-            # kfold monte-carlo does not have ci for R2
-            if model is not "kfold":
-                p6_render_patch1 = p6.patches("monte_line_key1_value", "monte_line0_full", alpha=0, color="red", source=source)
-                p6_render_patch1.selection_glyph = Patches(fill_alpha=0.1, fill_color="red", line_color="white")
-                p6_render_patch1.nonselection_glyph.fill_alpha = 0
-                p6_render_patch1.nonselection_glyph.line_color = "white"
+        if style == 0:
+            if self.n_mc > 1:
+                p6_render_patch2 = p6.patches("monte_line_key1_value", "monte_line0_cv", alpha=0, color="blue", source=source)
+                p6_render_patch2.selection_glyph = Patches(fill_alpha=0.1, fill_color="blue", line_color="white")
+                p6_render_patch2.nonselection_glyph.fill_alpha = 0
+                p6_render_patch2.nonselection_glyph.line_color = "white"
+                # kfold monte-carlo does not have ci for R2
+                if model is not "kfold":
+                    p6_render_patch1 = p6.patches("monte_line_key1_value", "monte_line0_full", alpha=0, color="red", source=source)
+                    p6_render_patch1.selection_glyph = Patches(fill_alpha=0.1, fill_color="red", line_color="white")
+                    p6_render_patch1.nonselection_glyph.fill_alpha = 0
+                    p6_render_patch1.nonselection_glyph.line_color = "white"
 
-        p6_render_1 = p6.multi_line("line_key1_value", "line0_full", line_color="red", line_width=2 * scale, source=source, legend=full_legend)
-        p6_render_1.selection_glyph = MultiLine(line_color="red", line_alpha=0.8, line_width=2 * scale)
-        p6_render_1.nonselection_glyph.line_color = "red"
-        p6_render_1.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
+            p6_render_1 = p6.multi_line("line_key1_value", "line0_full", line_color="red", line_width=2 * scale, source=source, legend=full_legend)
+            p6_render_1.selection_glyph = MultiLine(line_color="red", line_alpha=0.8, line_width=2 * scale)
+            p6_render_1.nonselection_glyph.line_color = "red"
+            p6_render_1.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
 
-        p6_render_2 = p6.circle("key0_value", "full_score", line_color="red", fill_color="white", size=8 * scale, source=source)
-        p6_render_2.selection_glyph = Circle(line_color="red", fill_color="white")
-        p6_render_2.nonselection_glyph.line_color = "red"
-        p6_render_2.nonselection_glyph.fill_color = "white"
-        p6_render_2.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
+            p6_render_2 = p6.circle("key0_value", "full_score", line_color="red", fill_color="white", size=8 * scale, source=source)
+            p6_render_2.selection_glyph = Circle(line_color="red", fill_color="white")
+            p6_render_2.nonselection_glyph.line_color = "red"
+            p6_render_2.nonselection_glyph.fill_color = "white"
+            p6_render_2.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
 
-        p6_render_3 = p6.multi_line("line_key1_value", "line0_cv", line_color="blue", line_width=2 * scale, source=source, legend=cv_legend)
-        p6_render_3.selection_glyph = MultiLine(line_color="blue", line_alpha=0.8, line_width=2 * scale)
-        p6_render_3.nonselection_glyph.line_color = "blue"
-        p6_render_3.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
+            p6_render_3 = p6.multi_line("line_key1_value", "line0_cv", line_color="blue", line_width=2 * scale, source=source, legend=cv_legend)
+            p6_render_3.selection_glyph = MultiLine(line_color="blue", line_alpha=0.8, line_width=2 * scale)
+            p6_render_3.nonselection_glyph.line_color = "blue"
+            p6_render_3.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
 
-        p6_render_4 = p6.circle("key0_value", "cv_score", line_color="blue", fill_color="white", size=8 * scale, source=source)
-        p6_render_4.selection_glyph = Circle(line_color="blue", fill_color="white")
-        p6_render_4.nonselection_glyph.line_color = "blue"
-        p6_render_4.nonselection_glyph.fill_color = "white"
-        p6_render_4.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
+            p6_render_4 = p6.circle("key0_value", "cv_score", line_color="blue", fill_color="white", size=8 * scale, source=source)
+            p6_render_4.selection_glyph = Circle(line_color="blue", fill_color="white")
+            p6_render_4.nonselection_glyph.line_color = "blue"
+            p6_render_4.nonselection_glyph.fill_color = "white"
+            p6_render_4.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
+        elif style == 1:
+            if self.n_mc > 1:
+                p6_render_patch2 = p6.patches("monte_line_key1_value", "monte_line0_cv", alpha=0, color="green", source=source)
+                p6_render_patch2.selection_glyph = Patches(fill_alpha=0.1, fill_color="green", line_color="white")
+                p6_render_patch2.nonselection_glyph.fill_alpha = 0
+                p6_render_patch2.nonselection_glyph.line_color = "white"
+                # kfold monte-carlo does not have ci for R2
+                if model is not "kfold":
+                    p6_render_patch1 = p6.patches("monte_line_key1_value", "monte_line0_full", alpha=0, color="green", source=source)
+                    p6_render_patch1.selection_glyph = Patches(fill_alpha=0.1, fill_color="green", line_color="white")
+                    p6_render_patch1.nonselection_glyph.fill_alpha = 0
+                    p6_render_patch1.nonselection_glyph.line_color = "white"
+
+            p6_render_1 = p6.multi_line("line_key1_value", "line0_full", line_color="green", line_width=2 * scale, source=source, legend=full_legend)
+            p6_render_1.selection_glyph = MultiLine(line_color="green", line_alpha=0.8, line_width=2 * scale)
+            p6_render_1.nonselection_glyph.line_color = "green"
+            p6_render_1.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
+
+            p6_render_2 = p6.circle("key0_value", "full_score", line_color="green", fill_color="white", size=8 * scale, source=source)
+            p6_render_2.selection_glyph = Circle(line_color="green", fill_color="white")
+            p6_render_2.nonselection_glyph.line_color = "green"
+            p6_render_2.nonselection_glyph.fill_color = "white"
+            p6_render_2.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
+
+            p6_render_3 = p6.multi_line("line_key1_value", "line0_cv", line_color="green", line_width=2 * scale, source=source, line_dash='dashed', legend=cv_legend)
+            p6_render_3.selection_glyph = MultiLine(line_color="green", line_alpha=0.8, line_width=2 * scale, line_dash="dashed")
+            p6_render_3.nonselection_glyph.line_color = "blue"
+            p6_render_3.nonselection_glyph.line_alpha = 0.05 / len(key0_unique)
+
+            p6_render_4 = p6.circle("key0_value", "cv_score", line_color="green", fill_color="white", size=8 * scale, source=source)
+            p6_render_4.selection_glyph = Circle(line_color="green", fill_color="white")
+            p6_render_4.nonselection_glyph.line_color = "green"
+            p6_render_4.nonselection_glyph.fill_color = "white"
+            p6_render_4.nonselection_glyph.line_alpha = 0.7 / len(key0_unique)
 
         # Text
         text_here = 8 * scale
@@ -1116,5 +1253,33 @@ class BaseCrossVal(ABC):
         p4.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
         p5.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
         p6.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+
+        if metric is not 'r2q2':
+            if method is 'ratio':
+                if alt is True:
+                    p4.title.text_font_size = str(10 * scale) + "pt"
+                    p4.xaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+                    p4.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+
+                    p1.title.text_font_size = str(11 * scale) + "pt"
+                    p2.title.text_font_size = str(11 * scale) + "pt"
+                    p3.title.text_font_size = str(11 * scale) + "pt"
+                    #p4.title.text_font_size = str(9 * scale) + "pt"
+                    p5.title.text_font_size = str(11 * scale) + "pt"
+                    p6.title.text_font_size = str(11 * scale) + "pt"
+
+                    # p1.xaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p2.xaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p3.xaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p4.xaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p5.xaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p6.xaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+
+                    # p1.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p2.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p3.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p4.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p5.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
+                    # p6.yaxis.axis_label_text_font_size = str(8 * scale) + "pt"
 
         return fig
