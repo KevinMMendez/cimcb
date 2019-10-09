@@ -277,11 +277,12 @@ class BC(BaseBootstrap):
                 # Make a copy (as it overwrites the input label/group)
                 if label is None:
                     group_copy = self.Y.copy()
-                    label_copy = None
+                    label_copy = pd.Series(self.Y)
                 else:
                     newlabel = np.array(label)
                     label_copy = deepcopy(label)
-                    group_copy = deepcopy(newlabel)
+                    #group_copy = deepcopy(newlabel)
+                    group_copy = self.Y.copy()
 
                 # Scatterplot
                 x, y = comb_x_scores[i]
@@ -326,7 +327,7 @@ class BC(BaseBootstrap):
                 # x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 # x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
                 Y = self.Y
-                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font,  parametric=bc, bc=True)
+                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font, parametric=bc, bc=True)
 
                 # self.x_rotate = x_rotate
                 # self.Y = group_copy
