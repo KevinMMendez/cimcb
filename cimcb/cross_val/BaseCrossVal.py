@@ -169,11 +169,12 @@ class BaseCrossVal(ABC):
                 # Make a copy (as it overwrites the input label/group)
                 if label is None:
                     group_copy = self.Y.copy()
-                    label_copy = None
+                    label_copy = pd.Series(self.Y)
                 else:
                     newlabel = np.array(label)
                     label_copy = deepcopy(label)
-                    group_copy = deepcopy(newlabel)
+                    #group_copy = deepcopy(newlabel)
+                    group_copy = self.Y.copy()
 
                 # Scatterplot
                 x, y = comb_x_scores[i]
