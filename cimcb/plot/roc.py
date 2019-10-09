@@ -71,25 +71,50 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
     tprs_ib_upp = np.percentile(tpr_boot, 97.5, axis=0)
     tprs_ib_mid = np.percentile(tpr_boot, 50, axis=0)
 
-    if bc is True:
+    # if bc is True:
+    #     if parametric is True:
+    #         low = tprs_ib_mid - tprs_ib_low
+    #         tprs_ib_upp = tprs_ib_mid + low
+    #         tprs_ib_upp[tprs_ib_upp > 1] = 1
+    #     elif parametric is False:
+            # low = tprs_ib_mid - tprs_ib_low
+            # tprs_ib_upp = tprs_ib_mid + low
+            # tprs_ib_upp[tprs_ib_upp > 1] = 1
+            # tprs_ib_upp[tprs_ib_upp_old >= 1] = 1
+    #     elif parametric is None:
+    #         tprs_ib_upp[tprs_ib_upp > -10] = 1
+    #     else:
+    #         tprs_ib_upp = tprs_ib_mid
+
+    if parametric is not 'null':
         tprs_ib_low = tprs_ib_low - tprs_diff
         tprs_ib_upp_old = deepcopy(tprs_ib_upp)
         tprs_ib_upp = tprs_ib_upp - tprs_diff
         tprs_ib_mid = tprs_ib_mid - tprs_diff
 
-        if parametric is True:
-            low = tprs_ib_mid - tprs_ib_low
-            tprs_ib_upp = tprs_ib_mid + low
-            tprs_ib_upp[tprs_ib_upp > 1] = 1
-        elif parametric is False:
-            low = tprs_ib_mid - tprs_ib_low
-            tprs_ib_upp = tprs_ib_mid + low
-            tprs_ib_upp[tprs_ib_upp > 1] = 1
-            tprs_ib_upp[tprs_ib_upp_old >= 1] = 1
-        elif parametric is None:
-            tprs_ib_upp[tprs_ib_upp > -10] = 1
-        else:
-            tprs_ib_upp = tprs_ib_mid
+    if parametric is "parametric":
+        low = tprs_ib_mid - tprs_ib_low
+        tprs_ib_upp = tprs_ib_mid + low
+        tprs_ib_upp[tprs_ib_upp > 1] = 1
+    elif parametric is "nonparametric":
+        low = tprs_ib_mid - tprs_ib_low
+        tprs_ib_upp = tprs_ib_mid + low
+        tprs_ib_upp[tprs_ib_upp > 1] = 1
+        tprs_ib_upp[tprs_ib_upp_old >= 1] = 1
+
+        for i in range(len(tprs_ib_upp)):
+            if i > 1:
+                if tprs_ib_upp[i] < tprs_ib_upp[i - 1]:
+                    tprs_ib_upp[i] = tprs_ib_upp[i - 1]
+
+    elif parametric is 'null':
+        pass
+    else:
+        raise ValueError("bc must be 'parametric', 'nonparametric', or 'null'.")
+
+
+
+
 
     # Add the starting 0
     tprs_ib_low = np.insert(tprs_ib_low, 0, 0)
