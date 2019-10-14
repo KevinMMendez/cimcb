@@ -21,7 +21,7 @@ class NN_SigmoidSigmoid(BaseModel):
     parametric = True
     bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.pfi_acc_", "model.pfi_r2q2_", "model.pfi_auc_"]  # list of metrics to bootstrap
 
-    def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True):
+    def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True, seed=None):
         self.n_neurons = n_neurons
         self.verbose = verbose
         self.n_epochs = epochs
@@ -37,6 +37,7 @@ class NN_SigmoidSigmoid(BaseModel):
         self.pfi_mean = pfi_mean
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
         self.compiled = False
+        self.seed = seed
         self.__name__ = 'cimcb.model.NN_SigmoidSigmoid'
         self.__params__ = {'n_neurons': n_neurons, 'epochs': epochs, 'learning_rate': learning_rate, 'momentum': momentum, 'decay': decay, 'nesterov': nesterov, 'loss': loss, 'batch_size': batch_size, 'verbose': verbose}
 
@@ -78,6 +79,7 @@ class NN_SigmoidSigmoid(BaseModel):
             self.epoch = Callback()
 
         if self.compiled == False:
+            np.random.seed(self.seed)
             self.model = Sequential()
             self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
             self.model.add(Dense(1, activation="sigmoid"))
