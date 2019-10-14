@@ -36,14 +36,14 @@ class NN_SigmoidSigmoid(BaseModel):
         self.pfi_nperm = pfi_nperm
         self.pfi_mean = pfi_mean
         self.optimizer = SGD(lr=learning_rate, momentum=momentum, decay=decay, nesterov=nesterov)
-
+        self.compiled = False
         self.__name__ = 'cimcb.model.NN_SigmoidSigmoid'
         self.__params__ = {'n_neurons': n_neurons, 'epochs': epochs, 'learning_rate': learning_rate, 'momentum': momentum, 'decay': decay, 'nesterov': nesterov, 'loss': loss, 'batch_size': batch_size, 'verbose': verbose}
 
     def set_params(self, params):
         self.__init__(**params)
 
-    def train(self, X, Y, epoch_ypred=False, epoch_xtest=None):
+    def train(self, X, Y, epoch_ypred=False, epoch_xtest=None, w1=False, w2=False):
         """ Fit the neural network model, save additional stats (as attributes) and return Y predicted values.
 
         Parameters
@@ -71,24 +71,35 @@ class NN_SigmoidSigmoid(BaseModel):
         self.X = X
         self.Y = Y
 
-        self.model = Sequential()
-        self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
-        self.model.add(Dense(1, activation="sigmoid", kernel_initializer='ones'))
-        #self.model.add(Dense(1, activation="sigmoid", kernel_initializer='ones', kernel_constraint=non_neg()))
-        #self.model.add(Dense(1, activation="sigmoid", kernel_constraint=non_neg()))
-        #self.model.add(Dense(1, activation="sigmoid", kernel_constraint=unit_norm(1)))
-        self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
-
         # If epoch_ypred is True, calculate ypred for each epoch
         if epoch_ypred is True:
             self.epoch = YpredCallback(self.model, X, epoch_xtest)
         else:
             self.epoch = Callback()
 
+        if self.compiled == False:
+            self.model = Sequential()
+            self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
+            self.model.add(Dense(1, activation="sigmoid"))
+            self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
+            self.model.w1 = self.model.layers[0].get_weights()
+            self.model.w2 = self.model.layers[1].get_weights()
+            self.compiled == True
+        else:
+            self.model.layers[0].set_weights(self.model.w1)
+            self.model.layers[1].set_weights(self.model.w2)
         #print("Before: {}".format(self.model.layers[1].get_weights()[0].flatten()))
         # print("Before: {}".format(self.model.layers[1].get_weights()[0]))
+
+        if w1 != False:
+            self.model.layers[0].set_weights(w1)
+            self.model.w1 = w1
+        if w2 != False:
+            self.model.layers[1].set_weights(w2)
+            self.model.w2 = w2
+
         # Fit
-        self.model.fit(X, Y, epochs=self.n_epochs, batch_size=self.batch_size, verbose=self.verbose, callbacks=[self.epoch])
+        self.model.fit(X, Y, epochs=self.n_epochs, batch_size=self.batch_size, verbose=self.verbose)
 
         self.model.pctvar_ = pctvar_calc(self.model, X, Y)
         #print("After: {} .... {}".format(self.model.layers[1].get_weights()[0].flatten(), self.model.pctvar_))
@@ -111,12 +122,19 @@ class NN_SigmoidSigmoid(BaseModel):
         y_pred_train = self.model.predict(X).flatten()
 
         # Sort by pctvar
-        order = np.argsort(self.model.pctvar_)[::-1]
-        self.model.x_scores_ = self.model.x_scores_[:, order]
-        self.model.x_loadings_ = self.model.x_loadings_[:, order]
-        self.model.y_loadings_ = self.model.y_loadings_[order]
-        self.model.y_loadings_ = self.model.y_loadings_.T
-        self.model.pctvar_ = self.model.pctvar_[order]
+        # if self.compiled == False:
+        #     if w1 == False:
+        #         order = np.argsort(self.model.pctvar_)[::-1]
+        #         self.model.x_scores_ = self.model.x_scores_[:, order]
+        #         self.model.x_loadings_ = self.model.x_loadings_[:, order]
+        #         self.model.y_loadings_ = self.model.y_loadings_[order]
+        #         self.model.y_loadings_ = self.model.y_loadings_.T
+        #         self.model.pctvar_ = self.model.pctvar_[order]
+        #         self.model.w1[0] = self.model.w1[0][:, order]
+        #         self.model.w2[0] = self.model.w2[0][order]
+        #     self.compiled = True
+
+        self.model.y_loadings_ = layer2_weight.T
 
         # Calculate pfi
         if self.pfi_nperm == 0:
@@ -153,28 +171,13 @@ class NN_SigmoidSigmoid(BaseModel):
         layer2_weight = self.model.layers[1].get_weights()[0]
         layer2_bias = self.model.layers[1].get_weights()[1]
 
-        self.model.x_scores_ = np.matmul(X, self.model.x_loadings_) + layer1_bias
+        self.model.x_scores_ = np.matmul(X, layer1_weight) + layer1_bias
         self.model.x_scores_alt = self.model.x_scores_
         #self.model.y_scores = np.matmul(self.model.x_scores_alt, self.model.y_loadings_) + layer2_bias
         y_pred_test = self.model.predict(X).flatten()
         self.Y_pred = y_pred_test
 
         return y_pred_test
-
-    def permutation_test(self, metric='r2q2', nperm=100, folds=5):
-        """Plots permutation test figures.
-
-        Parameters
-        ----------
-        nperm : positive integer, (default 100)
-            Number of permutations.
-        """
-        params = self.__params__
-        perm = permutation_test(NN_SigmoidSigmoid, params, self.X, self.Y, nperm=nperm, folds=folds)
-        perm.run()
-        fig = perm.plot(metric=metric)
-        output_notebook()
-        show(fig)
 
 
 def pctvar_calc(model, X, Y):

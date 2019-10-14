@@ -54,69 +54,82 @@ class kfold(BaseCrossVal):
         # Start Timer
         start = timeit.default_timer()
 
-        # Actual loop including Monte-Carlo reps
+        # FULL
+        full = Parallel(n_jobs=self.n_cores)(delayed(self._calc_full_loop)(i) for i in tqdm(range(len(self.param_list)), desc="1/2"))
+        self.ypred_full = []
+        self.x_scores_full = []
+        self.y_loadings_ = []
+        self.pctvar_ = []
+        self.w1 = []
+        self.w2 = []
+        for i in range(len(self.param_list)):
+            self.ypred_full.append(full[i][0])
+            self.x_scores_full.append(full[i][1])
+            self.y_loadings_.append(full[i][2])
+            self.pctvar_.append(full[i][3])
+            self.w1.append(full[i][4])
+            self.w2.append(full[i][5])
+
+        # for i in tqdm(range(len(self.param_list)), desc="1/2"):
+        #     parami = self.param_list[i]
+        #     model_i = self.model(**parami)
+        #     # model_i.set_params(parami)
+        #     # Full
+        #     model_i.train(self.X, self.Y)
+        #     ypred_full_i = model_i.test(self.X)
+        #     self.ypred_full.append(ypred_full_i)
+        #     self.x_scores_full.append(model_i.model.x_scores_)
+        #     self.y_loadings_.append(model_i.model.y_loadings_)
+        #     self.pctvar_.append(model_i.model.pctvar_)
+        #     if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+        #         self.w1.append(model_i.model.w1)
+        #         self.w2.append(model_i.model.w2)
+        #     else:
+        #         self.w1.append([0])
+        #         self.w2.append([0])
+
+        self.loop_w1 = self.w1 * self.n_mc
+        self.loop_w2 = self.w2 * self.n_mc
+
+        # Actual loop CV including Monte-Carlo reps
         self.loop_mc = self.param_list * self.n_mc
-        ypred = Parallel(n_jobs=self.n_cores)(delayed(self._calc_ypred_loop)(i) for i in tqdm(range(len(self.loop_mc))))
+        ypred = Parallel(n_jobs=self.n_cores)(delayed(self._calc_cv_loop)(i) for i in tqdm(range(len(self.loop_mc)), desc="2/2"))
 
         # Split ypred into full / cv and put in final format
         # Format :::> self.ypred_full -> parameter_type -> monte-carlo -> y_true / y_pred
-        self.ypred_full = [[] for i in range(len(self.param_list))]
         self.ypred_cv = [[] for i in range(len(self.param_list))]
-        self.x_scores_full = [[] for i in range(len(self.param_list))]
         self.x_scores_cv = [[] for i in range(len(self.param_list))]
         self.loop_mc_numbers = list(range(len(self.param_list))) * self.n_mc
-        self.y_loadings_ = [[] for i in range(len(self.param_list))]
-        self.pctvar_ = [[] for i in range(len(self.param_list))]
         for i in range(len(self.loop_mc)):
             j = self.loop_mc_numbers[i]  # Location to append to
-            self.ypred_full[j].append(ypred[i][0])
-            self.ypred_cv[j].append(ypred[i][1])
-            self.x_scores_full[j].append(ypred[i][2])
-            self.x_scores_cv[j].append(ypred[i][3])
-            self.y_loadings_[j].append(ypred[i][4])
-            self.pctvar_[j].append(ypred[i][5])
+            self.ypred_cv[j].append(ypred[i][0])
+            self.x_scores_cv[j].append(ypred[i][1])
 
         # Stop timer
         stop = timeit.default_timer()
         self.parallel_time = (stop - start) / 60
         print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
 
-    def calc_ypred_epoch(self):
-        """Calculates ypred full and ypred cv for each epoch (edge case)."""
+    def _calc_full_loop(self, i):
+        parami = self.param_list[i]
+        model_i = self.model(**parami)
+        # model_i.set_params(parami)
+        # Full
+        model_i.train(self.X, self.Y)
+        ypred_full_i = model_i.test(self.X)
+        ypred_full = ypred_full_i
+        x_scores_full = model_i.model.x_scores_
+        y_loadings_ = model_i.model.y_loadings_
+        pctvar_ = model_i.model.pctvar_
+        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+            w1 = model_i.model.w1
+            w2 = model_i.model.w2
+        else:
+            w1 = 0
+            w2 = 0
+        return [ypred_full, x_scores_full, y_loadings_, pctvar_, w1, w2]
 
-        time.sleep(0.5)  # Sleep for 0.5 secs to finish printing
-
-        # Start Timer
-        start = timeit.default_timer()
-
-        # Set param to the max -> Actual loop including Monte-Carlo reps
-        epoch_param = [self.param_list[-1]]
-        self.loop_mc = epoch_param * self.n_mc
-        ypred, x_scores_ = Parallel(n_jobs=self.n_cores)(delayed(self._calc_ypred_loop_epoch)(i) for i in tqdm(range(len(self.loop_mc))))
-        self.x = ypred
-        # Get epoch list
-        self.epoch_list = []
-        for m in self.param_list2:
-            for t, v in m.items():
-                self.epoch_list.append(v - 1)
-
-        self.x_scores_ = x_scores_
-        # Split ypred into full / cv and put in final format
-        # Format :::> self.ypred_full -> parameter_type -> monte-carlo -> y_true / y_pred
-        # Note, we need to pull out the specific epochs from the model
-        self.ypred_full = [[] for i in range(len(self.epoch_list))]
-        self.ypred_cv = [[] for i in range(len(self.epoch_list))]
-        for i in range(len(self.loop_mc)):
-            for j in range(len(self.epoch_list)):
-                self.ypred_full[j].append(ypred[i][0][j])
-                self.ypred_cv[j].append(ypred[i][1][j])
-
-        # Stop timer
-        stop = timeit.default_timer()
-        self.parallel_time = (stop - start) / 60
-        print("Time taken: {:0.2f} minutes with {} cores".format(self.parallel_time, self.n_cores))
-
-    def _calc_ypred_loop(self, i):
+    def _calc_cv_loop(self, i):
         """Core component of calc_ypred."""
         # Set hyper - parameters
         params_i = self.loop_mc[i]
@@ -124,89 +137,15 @@ class kfold(BaseCrossVal):
         model_i.set_params(params_i)
         # Full
         model_i.train(self.X, self.Y)
-        ypred_full_i = model_i.test(self.X)
-        ypred_full = ypred_full_i
-        # Calc x_scores_full is applicable
-        x_scores_full = [None] * len(self.Y)
-        if "model.x_scores_" in model_i.bootlist:
-            x_scores_full = model_i.model.x_scores_
-        if "model.y_loadings_" in model_i.bootlist:
-            y_loadings_full = model_i.model.y_loadings_
-        if "model.pctvar_" in model_i.bootlist:
-            pctvar_full = model_i.model.pctvar_
+        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+            model_i.train(self.X, self.Y, w1=self.loop_w1[i], w2=self.loop_w2[i])
+        else:
+            model_i.train(self.X, self.Y)
+
         # CV (for each fold)
         ypred_cv_i, x_scores_cv = self._calc_cv_ypred(model_i, self.X, self.Y)
         ypred_cv = ypred_cv_i
-        return [ypred_full, ypred_cv, x_scores_full, x_scores_cv, y_loadings_full, pctvar_full]
-
-    def _calc_ypred_loop_epoch(self, i):
-        """Core component of calc_ypred."""
-        # Put ypred into standard format
-        epoch_list = []
-        for i in self.param_list2:
-            for k, v in i.items():
-                epoch_list.append(v - 1)
-        # Set hyper-parameters
-        param = self.loop_mc[-1]
-        model_i = self.model(**param)
-        # Full
-        model_i.train(self.X, self.Y, epoch_ypred=True, epoch_xtest=self.X)
-        ypred_full_i = model_i.epoch.Y_test
-        ypred_full = []
-        for i in range(len(epoch_list)):
-            actual_epoch = epoch_list[i]
-            ypred_full.append(ypred_full_i[actual_epoch])
-        # CV
-        # if Y is one-hot encoded, flatten it for Stratified Kfold
-        try:
-            if len(Y[0]) > 1:
-                dummy = pd.DataFrame(Y)
-                stratY = dummy.idxmax(axis=1)
-            else:
-                stratY = Y
-        except TypeError:
-            stratY = Y
-        # split
-        if len(self.X) == len(self.Y):
-            fold_split = []
-            for train, test in self.crossval_idx.split(self.X, stratY):
-                fold_split.append((train, test))
-        else:
-            fold_split = []
-            for train, test in self.crossval_idx.split(self.X[0], stratY):
-                fold_split.append((train, test))
-        # Split into train and test
-        ypred_cv_i = np.zeros((len(self.Y), len(epoch_list)))
-        for i in range(len(fold_split)):
-            train, test = fold_split[i]
-            if len(self.X) == len(self.Y):
-                X_train = self.X[train, :]
-                Y_train = self.Y[train]
-                X_test = self.X[test, :]
-                Y_test = self.Y[test]
-            else:
-                # Multiblock
-                X0 = self.X[0]
-                X1 = self.X[1]
-                Y = self.Y
-                X0_train = X0[train, :]
-                X1_train = X1[train, :]
-                X_train = [X0_train, X1_train]
-                Y_train = Y[train]
-                X0_test = X0[test, :]
-                X1_test = X1[test, :]
-                X_test = [X0_test, X1_test]
-            # Full
-            model_i.train(X_train, Y_train, epoch_ypred=True, epoch_xtest=X_test)
-            ypred_cv_i_j = model_i.epoch.Y_test
-            for j in range(len(epoch_list)):
-                ypred_ypred = ypred_cv_i_j[epoch_list[j]]
-                for (idx, val) in zip(test, ypred_ypred):
-                    ypred_cv_i[idx, j] = val.tolist()
-        ypred_cv = []
-        for i in range(len(ypred_cv_i.T)):
-            ypred_cv.append(ypred_cv_i[:, i])
-        return [ypred_full, ypred_cv]
+        return [ypred_cv_i, x_scores_cv]
 
     def calc_stats(self):
         """Calculates binary statistics from ypred full and ypred cv."""
@@ -220,28 +159,12 @@ class kfold(BaseCrossVal):
             cv_loop = []
 
             # Get all monte-carlo
-            for k in range(len(self.ypred_full[i])):
-
-                # Check if binary
-                try:
-                    if len(self.Y[0]) > 1:
-                        multiclass = True
-                    else:
-                        multiclass = False
-                except TypeError:
-                    multiclass = False
-
-                if multiclass == True:
-                    full_mc = multiclass_metrics(self.Y, self.ypred_full[i][k], parametric=self.model.parametric)
-                    cv_mc = multiclass_metrics(self.Y, self.ypred_cv[i][k], parametric=self.model.parametric)
-                else:
-                    full_mc = binary_metrics(self.Y, self.ypred_full[i][k], parametric=self.model.parametric)
-                    cv_mc = binary_metrics(self.Y, self.ypred_cv[i][k], parametric=self.model.parametric)
-                full_loop.append(full_mc)
+            for k in range(len(self.ypred_cv[i])):
+                cv_mc = binary_metrics(self.Y, self.ypred_cv[i][k], parametric=self.model.parametric)
                 cv_loop.append(cv_mc)
 
             # Average binary metrics
-            stats_full_i = full_loop[0]
+            stats_full_i = binary_metrics(self.Y, self.ypred_full[i], parametric=self.model.parametric)
             stats_cv_i = dict_median(cv_loop)
 
             # Rename columns
@@ -280,56 +203,24 @@ class kfold(BaseCrossVal):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
         x_scores_cv_i = [None] * len(Y)
-        try:
-            model_ii = deepcopy(model_i)  # Make a copy of the model
-        except TypeError:
-            model_ii = copy(model_i)
-        # if Y is one-hot encoded, flatten it for Stratified Kfold
-        try:
-            if len(Y[0]) > 1:
-                dummy = pd.DataFrame(Y)
-                stratY = dummy.idxmax(axis=1)
-            else:
-                stratY = Y
-        except TypeError:
-            stratY = Y
 
         if len(X) == len(Y):
-            for train, test in self.crossval_idx.split(X, stratY):
+            for train, test in self.crossval_idx.split(X, Y):
                 X_train = X[train, :]
                 Y_train = Y[train]
                 X_test = X[test, :]
-                model_ii.train(X_train, Y_train)
-                ypred_cv_i_j = model_ii.test(X_test)
-                # Return value to y_pred_cv in the correct position # Better way to do this
-                for (idx, val) in zip(test, ypred_cv_i_j):
-                    ypred_cv_i[idx] = val.tolist()
-
-                # Calc x_scores_cv is applicable
-                if "model.x_scores_" in model_ii.bootlist:
-                    x_scores_cv_i_j = model_ii.model.x_scores_
-                    for (idx, val) in zip(test, x_scores_cv_i_j):
-                        x_scores_cv_i[idx] = val.tolist()
-
-        else:
-            # Multiblock study
-            X0 = X[0]
-            X1 = X[1]
-            for train, test in self.crossval_idx.split(X0, stratY):
-                X0_train = X0[train, :]
-                X1_train = X1[train, :]
-                X_train = [X0_train, X1_train]
-                Y_train = Y[train]
-                X0_test = X0[test, :]
-                X1_test = X1[test, :]
-                X_test = [X0_test, X1_test]
                 model_i.train(X_train, Y_train)
                 ypred_cv_i_j = model_i.test(X_test)
                 # Return value to y_pred_cv in the correct position # Better way to do this
                 for (idx, val) in zip(test, ypred_cv_i_j):
                     ypred_cv_i[idx] = val.tolist()
 
+                # Calc x_scores_cv is applicable
+                if "model.x_scores_" in model_i.bootlist:
+                    x_scores_cv_i_j = model_i.model.x_scores_
+                    for (idx, val) in zip(test, x_scores_cv_i_j):
+                        x_scores_cv_i[idx] = val.tolist()
         return ypred_cv_i, x_scores_cv_i
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, method='ratio', style=1, alt=True):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, method='ratio', style=1, alt=True):
         super().plot(metric=metric, scale=scale, color_scaling=color_scaling, rotate_xlabel=rotate_xlabel, legend=legend, model="kfold", color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, style=style, method=method, alt=alt)

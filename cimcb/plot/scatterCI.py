@@ -141,10 +141,17 @@ def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, 
             hoverlabel2 = hoverlabel.copy()
             hoverlabel2_dict = hoverlabel2.to_dict("series")
             hoverlabel_copy = hoverlabel2_dict
+            # print(hoverlabel_copy)
         except TypeError:
             hoverlabel2 = label.copy()
             hoverlabel_copy = {}
             hoverlabel_copy[label2.name] = hoverlabel2.values.tolist()
+
+        if sort_abs is True:
+            hoverlabel2 = {}
+            for key, value in hoverlabel_copy.items():
+                hoverlabel2[key] = np.array(value)[sorted_idx]
+            hoverlabel_copy = hoverlabel2
 
     # Linking to another plot
     if linkrange is None:
@@ -180,12 +187,13 @@ def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, 
 
     # Base figure
     fig = figure(title=title, x_axis_label=xlabel, y_axis_label=ylabel, x_range=xrange, y_range=y_range, plot_width=int(len(x) / 10 * width), plot_height=height, tooltips=TOOLTIPS, toolbar_location="left", toolbar_sticky=False)
+    #  x_axis_location="above"
 
     # Add circles
     fig.circle("label", "x", size=10, alpha=0.6, color="col", source=source)
 
     # Add hline
-    hline = Span(location=hline, dimension="width", line_color="black", line_width=2, line_alpha=0.3)
+    hline = Span(location=hline, dimension="width", line_color="grey", line_width=2, line_alpha=0.9)
     fig.add_layout(hline)
 
     # Add error bars
@@ -199,6 +207,10 @@ def scatterCI(x, ci=None, label=None, hoverlabel=None, hline=0, sort_abs=False, 
 
     # X-axis orientation
     fig.xaxis.major_label_orientation = np.pi / 2
+
+    fig.outline_line_width = 2
+    fig.outline_line_alpha = 1
+    fig.outline_line_color = "black"
 
     # Extra padding
     fig.min_border_left = 20

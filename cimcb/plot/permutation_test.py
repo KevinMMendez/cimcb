@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 import multiprocessing
+from pydoc import locate
 from copy import deepcopy, copy
 from joblib import Parallel, delayed
 from bokeh.layouts import gridplot
@@ -14,7 +15,7 @@ from ..utils import binary_metrics
 
 class permutation_test():
     def __init__(self, model, params, X, Y, nperm=100, folds=5):
-        self.model = model
+        self.model = locate(model.__name__)
         self.params = params
         self.skf = StratifiedKFold(n_splits=folds)
         self.folds = folds
@@ -160,7 +161,7 @@ class permutation_test():
         fig1.min_border_right = 20
         fig1.min_border_top = 20
         fig1.min_border_bottom = 20
-        fig1.legend.location = "bottom_right"
+        #fig1.legend.location = "bottom_right"
 
         # Calculate Density cure for Figure 2
         # Density curve
@@ -209,8 +210,8 @@ class permutation_test():
         source2 = ColumnDataSource(data=data2)
         data2_line = {"x": [stats_r2[0], stats_r2[0]], "y": [max(x1_pdf_grid) + 1, 0], "hover": [str(data2_manu), str(data2_manu)]}
         source2_line = ColumnDataSource(data=data2_line)
-        r2fig2_line = fig2.line("x", "y", line_width=2, line_color="red", source=source2_line)
-        r2fig2 = fig2.circle("x", "y", fill_color="red", size=6, legend=full_text, source=source2)
+        r2fig2_line = fig2.line("x", "y", line_width=3, line_color="red", source=source2_line)
+        r2fig2 = fig2.circle("x", "y", fill_color="red", size=8, legend=full_text, source=source2)
 
         # Lollipops Q2
         # Do a t-test
@@ -228,8 +229,8 @@ class permutation_test():
         source3 = ColumnDataSource(data=data3)
         data3_line = {"x": [stats_q2[0], stats_q2[0]], "y": [(min(x2_pdf_grid) - 1), 0], "hover": [data3_manu, data3_manu]}
         source3_line = ColumnDataSource(data=data3_line)
-        q2fig2_line = fig2.line("x", "y", line_width=2, line_color="blue", source=source3_line)
-        q2fig2 = fig2.circle("x", "y", fill_color="blue", size=6, legend=cv_text, source=source3)
+        q2fig2_line = fig2.line("x", "y", line_width=3, line_color="blue", source=source3_line)
+        q2fig2 = fig2.circle("x", "y", fill_color="blue", size=8, legend=cv_text, source=source3)
 
         # Add text
         textr2 = "True " + full_text + "\nP-Value: {}".format(data2_manu)
@@ -241,7 +242,9 @@ class permutation_test():
         fig1.yaxis.axis_label_text_font_size = "13pt"
         fig2.xaxis.axis_label_text_font_size = "12pt"
         fig2.yaxis.axis_label_text_font_size = "12pt"
-        fig2.legend.location = "top_left"
+        #fig2.legend.location = "top_left"
+        fig1.legend.visible = True
+        fig2.legend.visible = True
 
         fig = gridplot([[fig1, fig2]])
         return fig

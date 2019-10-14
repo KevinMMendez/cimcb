@@ -65,11 +65,6 @@ class BaseCrossVal(ABC):
         pass
 
     @abstractmethod
-    def calc_ypred_epoch(self):
-        """Calculates ypred full and ypred cv."""
-        pass
-
-    @abstractmethod
     def calc_stats(self):
         """Calculates binary statistics from ypred full and ypred cv."""
         pass
@@ -105,39 +100,97 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot_projections(self, param=None, components=None, label=None, size=12, scatter2=False, legend=False, scatter_show=None, meanfull=True):
+    def plot_projections(self, components="all", label=None, size=12, scatter2=False, legend="all", plot="ci", meanfull=True, roc_title=False, **kwargs):
 
-        if scatter_show == None:
+        if components == "all":
+            components = None
+
+        legend_scatter = False
+        legend_dist = False
+        legend_roc = False
+        if legend in [True,'all']:
+            legend_scatter = True
+            legend_dist = True
+            legend_roc = True
+        if legend in [False,'none',None]:
+            legend_scatter = False
+            legend_dist = False
+            legend_roc = False
+        if legend is "scatter":
+            legend_scatter = True
+        if legend is "dist":
+            legend_dist = True
+        if legend is "roc":
+            legend_roc = True
+
+
+        # if scatter_show == None:
+        #     scatter_show = 0
+        # elif scatter_show == "None":
+        #     scatter_show = 0
+        # elif scatter_show == "Inner":
+        #     scatter_show = 1
+        # elif scatter_show == "Full":
+        #     scatter_show = 2
+        # elif scatter_show == "CV":
+        #     scatter_show = 3
+        # elif scatter_show == "All":
+        #     scatter_show = 4
+        # else:
+        #     raise ValueError("scatter has to be either 'None', 'Inner', 'Full', 'CV', 'All'")
+
+        if plot == "ci":
             scatter_show = 0
-        elif scatter_show == "None":
-            scatter_show = 0
-        elif scatter_show == "Inner":
+        elif plot == "innerci":
             scatter_show = 1
-        elif scatter_show == "Full":
+        elif plot == "full":
             scatter_show = 2
-        elif scatter_show == "CV":
+        elif plot == "cv":
             scatter_show = 3
-        elif scatter_show == "All":
+        elif plot == "all":
             scatter_show = 4
         else:
-            raise ValueError("scatter has to be either 'None', 'Inner', 'Full', 'CV', 'All'")
+             raise ValueError("plot has to be either 'ci', 'innerci', 'full', 'cv', 'all'.")
 
-        if param == None:
-            p = -1
-        else:
-            try:
-                p = np.where(np.array(self.param_list) == param)[0][0]
-            except IndexError:
-                p = -1
 
-        if meanfull == False:
-            x_scores_full = self.x_scores_full[p][0]
+
+        # if param == None:
+        #     p = -1
+        # else:
+        #     try:
+        #         p = np.where(np.array(self.param_list) == param)[0][0]
+        #     except IndexError:
+        #         p = -1
+
+        perfect_param = {}
+        for key,value in self.param_dict.items():
+            if len(value) > 1:
+                if key is "n_components" or key is "n_neurons":
+                    perfect_param[key] = value[-1]
+                elif key in kwargs:
+                    if kwargs[key] in value:
+                        perfect_param[key] = kwargs[key]
+                    else:
+                        print("Check Again! Value '{}' entered for {} doesn't exist.".format(key, kwargs[key]))
+                        perfect_param[key] = value[-1]
+                else:
+                    perfect_param[key] = value[-1]
+                    print("{} set to {}. To change this, enter the key/value as an input argument e.g. {}={}".format(key, value[-1], key, value[1]))
+            else:
+                perfect_param[key] = value[0]
+        p = np.where(np.array(perfect_param) == self.param_list)[0][0]
+
+        if self.model.__name__ == 'NN_SigmoidSigmoid':
+            lv_name = "Neuron"
         else:
-            x_scores_full = np.median(np.array(self.x_scores_full[p]), axis=0)
+            lv_name = "LV"
+
+        x_scores_full = self.x_scores_full[p]
+
         x_scores_cv = np.median(np.array(self.x_scores_cv[p]), axis=0)
         x_scores_cvall = np.array(self.x_scores_cv[p])
-        pctvar_ = self.pctvar_[p][0]
-        y_loadings_ = self.y_loadings_[p][0][0]
+        pctvar_ = self.pctvar_[p]
+        y_loadings_ = self.y_loadings_[p][0]
 
         scatterplot = scatter2
         num_x_scores = len(x_scores_full.T)
@@ -161,6 +214,7 @@ class BaseCrossVal(ABC):
             width_height = int(950 / len(components))
             circle_size_scoreplot = size / len(components)
             label_font = str(13 - len(components)) + "pt"
+            title_font = str(13 - len(components)) + "pt"
 
             # Create empty grid
             grid = np.full((num_x_scores, num_x_scores), None)
@@ -178,23 +232,26 @@ class BaseCrossVal(ABC):
 
                 # Scatterplot
                 x, y = comb_x_scores[i]
-                xlabel = "LV {} ({:0.1f}%)".format(x + 1, pctvar_[x])
-                ylabel = "LV {} ({:0.1f}%)".format(y + 1, pctvar_[y])
+                xlabel = "{} {} ({:0.1f}%)".format(lv_name, x + 1, pctvar_[x])
+                ylabel = "{} {} ({:0.1f}%)".format(lv_name, y + 1, pctvar_[y])
                 gradient = y_loadings_[y] / y_loadings_[x]
                 max_range = max(np.max(np.abs(x_scores_full[:, x])), np.max(np.abs(x_scores_cv[:, y])))
                 new_range_min = -max_range - 0.05 * max_range
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
 
-                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
+                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
+            dist_label1 = np.array(label_copy[self.Y==0])[0]
+            dist_label2 = np.array(label_copy[self.Y==1])[0]
+            dist_label = [str(dist_label1), str(dist_label2)]
 
             for i in components:
                 i = i - 1
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
-                xlabel = "LV {} ({:0.1f}%)".format(i + 1, pctvar_[i])
-                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid)
+                xlabel = "{} {} ({:0.1f}%)".format(lv_name, i + 1, pctvar_[i])
+                grid[i, i] = distribution(score_dist, group=group_dist, group_label=dist_label, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid, legend=legend_dist)
 
             # Append each roc curve
             for i in range(len(comb_x_scores)):
@@ -221,7 +278,7 @@ class BaseCrossVal(ABC):
 
                 # grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
 
-                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font)
+                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), legend=legend_roc, label_font_size=label_font, title_font_size=title_font, show_title=roc_title)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())
@@ -229,7 +286,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -255,7 +312,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend="bottom_right", ci=95, method='ratio', style=0, alt=True):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend=True, ci=95, method='ratio', style=0, alt=True):
         """Used for plot function if the number of parameters is 1."""
 
         # Get ci
@@ -371,10 +428,10 @@ class BaseCrossVal(ABC):
         fig1 = figure(x_axis_label=cv_text, y_axis_label=diff_text, title=fig1_title, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", plot_width=width, plot_height=height, x_range=(min(cv) - 0.03, max(cv) + 0.03), y_range=(min(diff) - 0.03, max(diff) + 0.03))
 
         # Figure 1: Add a line
-        fig1_line = fig1.line(cv, diff, line_width=2, line_color="black", line_alpha=0.25)
+        fig1_line = fig1.line(cv, diff, line_width=3, line_color="black", line_alpha=0.25)
 
         # Figure 1: Add circles (interactive click)
-        fig1_circ = fig1.circle("cv", "diff", size=12, alpha=0.7, color="green", source=source)
+        fig1_circ = fig1.circle("cv", "diff", size=13, alpha=0.7, color="green", source=source)
         fig1_circ.selection_glyph = Circle(fill_color="green", line_width=2, line_color="black")
         fig1_circ.nonselection_glyph.fill_color = "green"
         fig1_circ.nonselection_glyph.fill_alpha = 0.4
@@ -465,16 +522,16 @@ class BaseCrossVal(ABC):
                     fig2.patch(x_patch, y_patch_r2, alpha=0.10, color="green")
 
             # Figure 2: add full
-            fig2_line_full = fig2.line(values_string, full, line_color="green", line_width=2, legend=full_legend)
-            fig2_circ_full = fig2.circle("values_string", "full", line_color="green", fill_color="white", fill_alpha=1, size=8, source=source)
+            fig2_line_full = fig2.line(values_string, full, line_color="green", line_width=3, legend=full_legend)
+            fig2_circ_full = fig2.circle("values_string", "full", line_color="green", fill_color="white", fill_alpha=1, size=10, source=source)
             fig2_circ_full.selection_glyph = Circle(line_color="green", fill_color="white", line_width=2)
             fig2_circ_full.nonselection_glyph.line_color = "green"
             fig2_circ_full.nonselection_glyph.fill_color = "white"
             fig2_circ_full.nonselection_glyph.line_alpha = 0.4
 
             # Figure 2: add cv
-            fig2_line_cv = fig2.line(values_string, cv, line_color="green", line_width=2, line_dash='dashed', legend=cv_legend)
-            fig2_circ_cv = fig2.circle("values_string", "cv", line_color="green", fill_color="white", fill_alpha=1, size=8, source=source)
+            fig2_line_cv = fig2.line(values_string, cv, line_color="green", line_width=3, line_dash='dashed', legend=cv_legend)
+            fig2_circ_cv = fig2.circle("values_string", "cv", line_color="green", fill_color="white", fill_alpha=1, size=10, source=source)
             fig2_circ_cv.selection_glyph = Circle(line_color="green", fill_color="white", line_width=2)
             fig2_circ_cv.nonselection_glyph.line_color = "green"
             fig2_circ_cv.nonselection_glyph.fill_color = "white"
@@ -503,11 +560,17 @@ class BaseCrossVal(ABC):
             fig2.xaxis.major_label_orientation = np.pi / 2
 
         # Figure 2: legend
-        if legend == None or legend == False:
-            fig2.legend.visible = False
+        if legend is True:
+            fig2.legend.visible = True
+            fig2.legend.location = "bottom_right"
         else:
-            fig2.legend.location = legend
-            fig2.legend.location = legend
+            fig2.legend.visible = False
+
+        # if legend == None or legend == False:
+        #     fig2.legend.visible = False
+        # else:
+        #     fig2.legend.location = legend
+        #     fig2.legend.location = legend
 
         # Hide legend if it is clicked
         # def show_hide_legend(legend=fig2.legend[0]):
@@ -529,7 +592,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend="bottom_right", color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
 
         # legend always None
         legend = None
@@ -917,7 +980,7 @@ class BaseCrossVal(ABC):
         p3_render.nonselection_glyph.line_color = "white"
 
         # Extra for heatmaps
-        p1.plot_width = int(320 * scale)
+        p1.plot_width = int(315 * scale)
         p1.plot_height = int(257 * scale)
         p1.grid.grid_line_color = None
         p1.axis.axis_line_color = None
@@ -929,7 +992,7 @@ class BaseCrossVal(ABC):
         p1.title.text_font_size = str(14 * scale) + "pt"
         p1.xaxis.major_label_orientation = math.radians(heatmap_xaxis_rotate)
 
-        p2.plot_width = int(320 * scale)
+        p2.plot_width = int(315 * scale)
         p2.plot_height = int(257 * scale)
         p2.grid.grid_line_color = None
         p2.axis.axis_line_color = None
@@ -941,7 +1004,7 @@ class BaseCrossVal(ABC):
         p2.title.text_font_size = str(14 * scale) + "pt"
         p2.xaxis.major_label_orientation = math.radians(heatmap_xaxis_rotate)
 
-        p3.plot_width = int(320 * scale)
+        p3.plot_width = int(315 * scale)
         p3.plot_height = int(257 * scale)
         p3.grid.grid_line_color = None
         p3.axis.axis_line_color = None
@@ -986,7 +1049,7 @@ class BaseCrossVal(ABC):
         p4_render.nonselection_glyph.line_color = "white"
         p4.add_tools(HoverTool(renderers=[p4_render], tooltips=[(full_title, "@full_text"), (cv_title, "@cv_text"), (diff_title, "@diff_text")]))
 
-        p4.plot_width = int(320 * scale)
+        p4.plot_width = int(315 * scale)
         p4.plot_height = int(257 * scale)
         p4.axis.major_label_text_font_size = str(8 * scale) + "pt"
         p4.xaxis.axis_label_text_font_size = str(12 * scale) + "pt"
@@ -1013,7 +1076,7 @@ class BaseCrossVal(ABC):
         y_range_min = min(cv_score) - min(cv_score) * 0.1
         y_range_max = max(full_score) + max(full_score) * 0.05
 
-        p5 = figure(title=l1_title, x_axis_label=param_keys_axis[0], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l1_xrange2, tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
+        p5 = figure(title=l1_title, x_axis_label=param_keys_axis[0], y_axis_label=y_axis_text, plot_width=int(315 * scale), plot_height=int(257 * scale), x_range=l1_xrange2, tools="pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
         p5.quad(top=[1000], bottom=[-1000], left=[l1_xrange[-1]], right=[1000], color="white")
 
         # p5.outline_line_color = "white"
@@ -1124,7 +1187,7 @@ class BaseCrossVal(ABC):
         l2_title = y_axis_text + " over " + param_keys_title[1]
         y_range_min = min(cv_score) - min(cv_score) * 0.1
         y_range_max = max(full_score) + max(full_score) * 0.05
-        p6 = figure(title=l2_title, x_axis_label=param_keys_axis[1], y_axis_label=y_axis_text, plot_width=int(320 * scale), plot_height=int(257 * scale), x_range=l2_xrange2, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
+        p6 = figure(title=l2_title, x_axis_label=param_keys_axis[1], y_axis_label=y_axis_text, plot_width=int(315 * scale), plot_height=int(257 * scale), x_range=l2_xrange2, tools="tap,pan,wheel_zoom,box_zoom,reset,save,lasso_select,box_select", y_range=(y_range_min, y_range_max))
         p6.quad(top=[1000], bottom=[-1000], left=[l2_xrange[-1]], right=[1000], color="white")
 
         if style == 0:
@@ -1217,8 +1280,8 @@ class BaseCrossVal(ABC):
             p5.legend.visible = False
             p6.legend.visible = False
         else:
-            p5.legend.location = legend
-            p6.legend.location = legend
+            p5.legend.visible = True
+            p6.legend.visible = True
 
         # Center title
         if title_align == "center":

@@ -21,9 +21,9 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
     # Error check
     if len(x) != len(y):
         raise ValueError("length of X does not match length of Y.")
-
     # If label is None, give an index based on input order
     if label is None:
+        label = pd.Series(np.zeros(len(x),))
         label_copy = {}
         label_copy["Idx"] = list(range(len(x)))
     else:
@@ -144,6 +144,8 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
         y_score = y
         # Score plot extra: 95% confidence ellipse using PCA
         unique_group = np.sort(np.unique(group_label))
+        unique_group_label = np.sort(label.unique())
+        # print(unique_group_label)
 
         # Set colour per group
         list_color = ["red", "blue", "green", "black", "orange", "yellow", "brown", "cyan"]
@@ -168,17 +170,17 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
 
             # Plot ci95 ellipse outer line
             if scattershow is 1:
-                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group[i]))
+                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group_label[i]))
             else:
-                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group[i]))
-                fig.line(p[:, 0], p[:, 1], color=list_color[i], alpha=0.4)
+                fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="solid", legend="{}".format(unique_group_label[i]))
+                fig.line(p[:, 0], p[:, 1], color=list_color[i], line_width=3, alpha=0.4)
 
             # Plot ci95 ellipse shade
             if scattershow is 1:
                 fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
             else:
-                fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
-                fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
+                fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.15)
+                fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.02)
             fig.x(np.median(m[:, 0]), np.median(m[:, 1]), size=size, alpha=0.6, color=list_color[i], line_width=2)
 
             if scattershow is 1:
@@ -223,14 +225,14 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
                     fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="dashed")
                 else:
                     fig.line(m[:, 0], m[:, 1], color=list_color[i], line_width=2, alpha=0.8, line_dash="dashed")
-                    fig.line(p[:, 0], p[:, 1], color=list_color[i], alpha=0.4, line_dash="dashed")
+                    fig.line(p[:, 0], p[:, 1], color=list_color[i], line_width=3, alpha=0.4, line_dash="dashed")
 
                 # Plot ci95 ellipse shade
                 if scattershow is 1:
                     fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
                 else:
-                    fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.07)
-                    fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.01)
+                    fig.patch(m[:, 0], m[:, 1], color=list_color[i], alpha=0.15)
+                    fig.patch(p[:, 0], p[:, 1], color=list_color[i], alpha=0.02)
                 fig.x(np.median(m[:, 0]), np.median(m[:, 1]), size=size, alpha=0.6, color=list_color[i], line_width=2)
 
                 if scattershow is 1:

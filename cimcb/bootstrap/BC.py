@@ -3,6 +3,7 @@ import scipy
 import pandas as pd
 from scipy.stats import norm
 import math
+import multiprocessing
 from copy import deepcopy
 from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.plotting import ColumnDataSource, figure, output_notebook, show
@@ -43,15 +44,8 @@ class BC(BaseBootstrap):
         To return bootci, initalise then use method run().
     """
 
-    def __init__(self, model, bootnum=100, seed=None):
-        super().__init__(model=model, bootnum=bootnum, seed=seed)
-        self.stat = {}
-
-    def calc_stat(self):
-        """Stores selected attributes (from self.bootlist) for the original model."""
-        self.stat = {}
-        for i in self.bootlist:
-            self.stat[i] = nested_getattr(self.model, i)
+    def __init__(self, model, bootnum=100, seed=None, n_cores=-1):
+        super().__init__(model=model, bootnum=bootnum, seed=seed, n_cores=n_cores)
 
     def calc_bootidx(self):
         super().calc_bootidx()
@@ -65,13 +59,38 @@ class BC(BaseBootstrap):
             self.bootci[i] = self.bootci_method(self.bootstat[i], self.stat[i])
 
     def run(self):
-        self.calc_stat()
         self.calc_bootidx()
         self.calc_bootstat()
         self.calc_bootci()
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric'):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc'):
+
+        legend_violin = False
+        legend_dist = False
+        legend_roc = False
+        if legend in [True, 'all']:
+            legend_violin = True
+            legend_dist = True
+            legend_roc = True
+        if legend in [False, 'none', None]:
+            legend_violin = False
+            legend_dist = False
+            legend_roc = False
+        if legend is "violin":
+            legend_violin = True
+        if legend is "dist":
+            legend_dist = True
+        if legend is "roc":
+            legend_roc = True
+
         Y = self.Y
+        if label is None:
+            label = ['0', '1']
+        else:
+            label1 = np.array(label[self.Y == 0])[0]
+            label2 = np.array(label[self.Y == 1])[0]
+            label = [str(label1), str(label2)]
+
         violin_title = ""
 
         # OOB
@@ -123,17 +142,20 @@ class BC(BaseBootstrap):
         self.Yscore_combined = Yscore_combined
         self.Ytrue_combined = Ytrue_combined
         Ytrue_combined_name = Ytrue_combined.astype(np.str)
+
         Ytrue_combined_name[Ytrue_combined == 0] = "IB (0)"
         Ytrue_combined_name[Ytrue_combined == 1] = "IB (1)"
         Ytrue_combined_name[Ytrue_combined == 2] = "OOB (0)"
         Ytrue_combined_name[Ytrue_combined == 3] = "OOB (1)"
-
-        violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Median Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["IB (0)", "OOB (0)", "IB (1)", "OOB (1)"], group_name_sort=["IB (0)", "IB (1)", "OOB (0)", "OOB (1)"], title=violin_title, font_size="11pt", label_font_size="10pt")
+        group_name = ["IB (0)", "OOB (0)", "IB (1)", "OOB (1)"]
+        group_name_sort = np.sort(group_name)
+        label_violin = label + label
+        violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Median Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=group_name, group_name_sort=group_name_sort, title=violin_title, legend=legend_violin, label=label_violin, font_size="11pt", label_font_size="10pt")
 
         # Distribution plot
-        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt", smooth=dist_smooth)
+        dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Median Predicted Score", ylabel="p.d.f.", width=320, height=315, padding=0.7, label_font_size="10pt", smooth=dist_smooth, group_label=label, legend_location="top_left", legend=legend_dist)
 
-        roc_bokeh = roc_plot_boot2(ypred_ib, ypred_oob, Y, self.bootstat['Y_pred'], self.bootidx, self.bootstat_oob['Y_pred'], self.bootidx_oob, self.stat['Y_pred'], width=320, height=315, label_font_size="10pt", parametric=bc, bc=True)
+        roc_bokeh = roc_plot_boot2(ypred_ib, ypred_oob, Y, self.bootstat['Y_pred'], self.bootidx, self.bootstat_oob['Y_pred'], self.bootidx_oob, self.stat['Y_pred'], width=320, height=315, label_font_size="10pt", parametric=bc, bc=True, legend=legend_roc)
 
         fig = layout([[violin_bokeh, dist_bokeh, roc_bokeh]])
         output_notebook()
@@ -161,7 +183,8 @@ class BC(BaseBootstrap):
         Peaksheet : DataFrame
             New PeakTable with added "Coef" and "VIP" columns (+ "Coef-95CI" and  "VIP-95CI" if calc_bootci is used prior to plot_featureimportance).
         """
-        n_loadings = len(self.model.model.x_loadings_[0])
+
+        n_loadings = len(self.bootci["model.x_loadings_"])
         ci_loadings = self.bootci["model.x_loadings_"]
 
         # Remove rows from PeakTable if not in peaklist
@@ -170,6 +193,11 @@ class BC(BaseBootstrap):
         peaklabel = PeakTable[ylabel]
 
         a = [None] * 2
+
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+            lv_name = "Neuron"
+        else:
+            lv_name = "LV"
 
         # Plot
         plots = []
@@ -184,7 +212,7 @@ class BC(BaseBootstrap):
                             hoverlabel=PeakTable[["Idx", "Name", "Label"]],
                             hline=0,
                             col_hline=True,
-                            title="Loadings Plot: LV{}".format(i + 1),
+                            title="Loadings Plot: {} {}".format(lv_name, i + 1),
                             sort_abs=sort,
                             sort_ci=sort_ci)
             plots.append([fig])
@@ -193,24 +221,45 @@ class BC(BaseBootstrap):
         output_notebook()
         show(fig)
 
-    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend=False, scatter_show=None):
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True):
         bootx = 1
         num_x_scores = len(self.stat['model.x_scores_'].T)
 
-        if scatter_show == None:
+        legend_scatter = False
+        legend_dist = False
+        legend_roc = False
+        if legend in [True, 'all']:
+            legend_scatter = True
+            legend_dist = True
+            legend_roc = True
+        if legend in [False, 'none', None]:
+            legend_scatter = False
+            legend_dist = False
+            legend_roc = False
+        if legend is "scatter":
+            legend_scatter = True
+        if legend is "dist":
+            legend_dist = True
+        if legend is "roc":
+            legend_roc = True
+
+        if plot == "ci":
             scatter_show = 0
-        elif scatter_show == "None":
-            scatter_show = 0
-        elif scatter_show == "Inner":
+        elif plot == "innerci":
             scatter_show = 1
-        elif scatter_show == "IB":
+        elif plot == "ib":
             scatter_show = 2
-        elif scatter_show == "OOB":
+        elif plot == "oob":
             scatter_show = 3
-        elif scatter_show == "All":
+        elif plot == "all":
             scatter_show = 4
         else:
-            raise ValueError("scatter has to be either 'None', 'Inner', 'IB', 'OOB', 'All'")
+            raise ValueError("plot has to be either 'ci', 'innerci', 'ib', 'oob', 'all'.")
+
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+            lv_name = "Neuron"
+        else:
+            lv_name = "LV"
 
         # pctvar
         pctvar_all = []
@@ -257,11 +306,23 @@ class BC(BaseBootstrap):
         # Original Scores
         x_scores_ = self.stat['model.x_scores_']
 
+        # BC
+        x_scores_bc = []
+        for i in self.bootci['model.x_scores_']:
+            x_scores_bc.append(i[:, 2])
+        x_scores_bc = np.array(x_scores_bc)
+        x_scores_bc = x_scores_bc.T
+
         if num_x_scores == 1:
             pass
         else:
-            x_scores_full = x_scores_ib
+            if scatter_ib is True:
+                x_scores_full = x_scores_ib
+            else:
+                x_scores_full = x_scores_
+            #x_scores_full = x_scores_bc
             x_scores_cv = x_scores_oob
+
             comb_x_scores = list(combinations(range(num_x_scores), 2))
 
             # Width/height of each scoreplot
@@ -286,8 +347,8 @@ class BC(BaseBootstrap):
 
                 # Scatterplot
                 x, y = comb_x_scores[i]
-                xlabel = "LV {} ({:0.1f}%)".format(x + 1, pctvar_[x])
-                ylabel = "LV {} ({:0.1f}%)".format(y + 1, pctvar_[y])
+                xlabel = "{} {} ({:0.1f}%)".format(lv_name, x + 1, pctvar_[x])
+                ylabel = "{} {} ({:0.1f}%)".format(lv_name, y + 1, pctvar_[y])
                 gradient = y_loadings_[y] / y_loadings_[x]
 
                 max_range = max(np.max(np.abs(x_scores_full[:, x])), np.max(np.abs(x_scores_cv[:, y])))
@@ -295,22 +356,25 @@ class BC(BaseBootstrap):
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
 
-                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
+                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
 
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
 
+            dist_label1 = np.array(label_copy[self.Y == 0])[0]
+            dist_label2 = np.array(label_copy[self.Y == 1])[0]
+            dist_label = [str(dist_label1), str(dist_label2)]
+
             for i in range(num_x_scores):
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
-                xlabel = "LV {} ({:0.1f}%)".format(i + 1, pctvar_[i])
-                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="density", width=width_height, height=width_height, label_font_size=label_font)
+                xlabel = "{} {} ({:0.1f}%)".format(lv_name, i + 1, pctvar_[i])
+                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, legend=legend_dist, group_label=dist_label)
 
             # Append each roc curve
             for i in range(len(comb_x_scores)):
                 x, y = comb_x_scores[i]
 
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
-                #theta = math.atan(1)
                 gradient = y_loadings_[y] / y_loadings_[x]
                 theta = math.atan(gradient)
                 x_rotate_stat = self.stat['model.x_scores_'][:, x] * math.cos(theta) + self.stat['model.x_scores_'][:, y] * math.sin(theta)
@@ -327,7 +391,7 @@ class BC(BaseBootstrap):
                 # x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 # x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
                 Y = self.Y
-                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=legend, label_font_size=label_font, parametric=bc, bc=True)
+                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, width=width_height, height=width_height, xlabel="1-Specificity (LV{}{}/LV{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), label_font_size=label_font, parametric=bc, bc=True, legend=legend_roc)
 
                 # self.x_rotate = x_rotate
                 # self.Y = group_copy
@@ -377,10 +441,7 @@ class BC(BaseBootstrap):
         ci_coef = self.bootci["model.coef_"]
         ci_vip = self.bootci["model.vip_"]
 
-        if self.model.__name__ == 'cimcb.model.NN_SigmoidSigmoid':
-            name_coef = "Feature Importance: Connection Weight"
-            name_vip = "Feature Importance: Garlson's Algorithm"
-        elif self.model.__name__ == 'cimcb.model.NN_LinearSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
             name_coef = "Feature Importance: Connection Weight"
             name_vip = "Feature Importance: Garlson's Algorithm"
         else:
@@ -397,20 +458,10 @@ class BC(BaseBootstrap):
         if name_vip == "Variable Importance in Projection (VIP)":
             fig_2 = scatterCI(self.stat['model.vip_'], ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title=name_vip, sort_abs=sort, sort_ci=sort_ci, sort_ci_abs=True)
         else:
-            fig_2 = scatterCI(self.stat['model.vip_'], ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=False, title=name_vip, sort_abs=sort, sort_ci_abs=True)
+            fig_2 = scatterCI(self.stat['model.vip_'], ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=np.average(self.stat['model.vip_']), col_hline=False, title=name_vip, sort_abs=sort, sort_ci_abs=True)
 
         ######
-        if self.model.pfi_nperm == 0:
-            fig = layout([[fig_1], [fig_2]])
-        else:
-            ci_pfi_acc_ = self.bootci["model.pfi_acc_"]
-            fig_3 = scatterCI(self.stat['model.pfi_acc_'], ci=ci_pfi_acc_, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Permutation Feature Importance: Accuracy", sort_abs=sort, sort_ci_abs=True)
-            ci_pfi_r2q2_ = self.bootci["model.pfi_r2q2_"]
-            fig_4 = scatterCI(self.stat['model.pfi_r2q2_'], ci=ci_pfi_r2q2_, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Permutation Feature Importance: R²", sort_abs=sort, sort_ci_abs=True)
-            ci_pfi_auc_ = self.bootci["model.pfi_auc_"]
-            fig_5 = scatterCI(self.stat['model.pfi_auc_'], ci=ci_pfi_auc_, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title="Permutation Feature Importance: AUC", sort_abs=sort, sort_ci_abs=True)
-            fig = layout([[fig_1], [fig_2], [fig_3], [fig_4], [fig_5]])
-
+        fig = layout([[fig_1], [fig_2]])
         output_notebook()
         show(fig)
 
@@ -420,28 +471,12 @@ class BC(BaseBootstrap):
         vip = pd.DataFrame([self.stat['model.vip_'], self.bootci["model.vip_"]]).T
         vip.rename(columns={0: "VIP", 1: "VIP-95CI"}, inplace=True)
 
-        if self.model.pfi_nperm > 0:
-            pfi_acc = pd.DataFrame([self.stat['model.pfi_acc_'], self.bootci["model.pfi_acc_"]]).T
-            pfi_acc.rename(columns={0: "PFI_ACC", 1: "PFI_ACC-95CI"}, inplace=True)
-            pfi_r2 = pd.DataFrame([self.stat['model.pfi_r2q2_'], self.bootci["model.pfi_r2q2_"]]).T
-            pfi_r2.rename(columns={0: "PFI_R2", 1: "PFI_R2-95CI"}, inplace=True)
-            pfi_auc = pd.DataFrame([self.stat['model.pfi_auc_'], self.bootci["model.pfi_auc_"]]).T
-            pfi_auc.rename(columns={0: "PFI_AUC", 1: "PFI_AUC-95CI"}, inplace=True)
-
         Peaksheet = PeakTable.copy()
         Peaksheet["Coef"] = coef["Coef"].values
         Peaksheet["VIP"] = vip["VIP"].values
-        if self.model.pfi_nperm > 0:
-            Peaksheet["PFI_ACC"] = pfi_acc["PFI_ACC"].values
-            Peaksheet["PFI_R2"] = pfi_r2["PFI_R2"].values
-            Peaksheet["PFI_AUC"] = pfi_auc["PFI_AUC"].values
 
         Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
         Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
-        if self.model.pfi_nperm > 0:
-            Peaksheet["PFI_ACC-95CI"] = pfi_acc["PFI_ACC-95CI"].values
-            Peaksheet["PFI_R2-95CI"] = pfi_r2["PFI_R2-95CI"].values
-            Peaksheet["PFI_AUC-95CI"] = pfi_auc["PFI_AUC-95CI"].values
 
         return Peaksheet
 

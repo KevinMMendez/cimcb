@@ -84,6 +84,30 @@ class BaseModel(ABC):
     #     self.boot = boot
     #     self.bootci = self.boot.run()
 
+    def permutation_test(self, metric='r2q2', nperm=100, folds=5):
+        """Plots permutation test figures.
+
+        Parameters
+        ----------
+        nperm : positive integer, (default 100)
+            Number of permutations.
+        """
+        params = self.__params__
+        perm = permutation_test(self, params, self.X, self.Y, nperm=nperm, folds=folds)
+        perm.run()
+
+        if type(metric) != list:
+            fig = perm.plot(metric=metric)
+        else:
+            fig_list = []
+            for i in metric:
+                fig_i = perm.plot(metric=i)
+                fig_list.append([fig_i])
+            fig = layout([[fig_list]])
+
+        output_notebook()
+        show(fig)
+
     def plot_featureimportance(self, PeakTable, peaklist=None, ylabel="Label", sort=True, sort_ci=True):
         """Plots feature importance metrics.
 
@@ -209,7 +233,7 @@ class BaseModel(ABC):
                             hoverlabel=PeakTable[["Idx", "Name", "Label"]],
                             hline=0,
                             col_hline=True,
-                            title="Loadings Plot: LV{}".format(i + 1),
+                            title="Loadings Plot: LV {}".format(i + 1),
                             sort_abs=sort,
                             sort_ci=sort_ci)
             plots.append([fig])
