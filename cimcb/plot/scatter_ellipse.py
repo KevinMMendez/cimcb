@@ -301,13 +301,11 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
     fig.min_border_bottom = 20
 
     # Remove legend
-    # if legend is True:
-    #     fig.legend.visible = True
-    #     fig.legend.location = "bottom_right"
-    # else:
-    #     fig.legend.visible = False
-    # if scatterplot is True:
-    #     if legend is False:
-    #         fig.legend.visible = False
+    if legend is True:
+        fig.legend.visible = True
+        fig.legend.location = "bottom_right"
+    else:
+        fig.legend.visible = False
+  
 
     return fig
