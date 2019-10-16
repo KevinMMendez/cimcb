@@ -19,7 +19,7 @@ from ..utils import binary_metrics, dict_median
 #import cimcb.model
 
 
-def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, bootidx_oob, stat, width=320, height=315, label_font_size="10pt", xlabel="1-Specificity", ylabel="Sensitivity", legend=True, parametric=True, bc=True):
+def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, bootidx_oob, stat, width=320, height=315, label_font_size="10pt", xlabel="1-Specificity", ylabel="Sensitivity", legend=True, parametric=True, bc=True, plot_num=0):
 
     auc_check = roc_auc_score(Y, stat)
     if auc_check > 0.5:
@@ -34,11 +34,17 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
     tpr_boot = []
     boot_stats = []
     auc_ib = []
+    pos_label = []
     for i in range(len(bootidx)):
         # Resample and get tpr, fpr
         Yscore_res = bootstat[i]
         Ytrue = Y[bootidx[i]]
         fpr_res, tpr_res, threshold_res = metrics.roc_curve(Ytrue, Yscore_res, pos_label=pos, drop_intermediate=False)
+        aucs = metrics.auc(fpr_res, tpr_res)
+        # Flip if wrong
+        if aucs < 0.5:
+            fpr_res, tpr_res, threshold_res = metrics.roc_curve(Ytrue, Yscore_res, pos_label=abs(pos-1), drop_intermediate=False)
+
         auc_ib.append(metrics.auc(fpr_res, tpr_res))
 
         # Drop intermediates when fpr=0
@@ -50,7 +56,6 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
         idx = [np.abs(i - fpr_res).argmin() for i in fpr]
         tpr_list = tpr_res[idx]
         tpr_boot.append(tpr_list)
-
     # Get CI for tpr
     tprs_ib_low = np.percentile(tpr_boot, 2.5, axis=0)
     tprs_ib_upp = np.percentile(tpr_boot, 97.5, axis=0)
@@ -101,9 +106,7 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
             if i > 1:
                 if tprs_ib_upp[i] < tprs_ib_upp[i - 1]:
                     tprs_ib_upp[i] = tprs_ib_upp[i - 1]
-    elif parametric is 'null':
-        pass
-    elif parametric is 'test':
+    elif parametric is 'test4':
         # Lets do a proper bias-correct based on AUC
         auc_boot = auc_ib
         auc_stat = auc_ib_mid
@@ -119,21 +122,77 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
         # new alpha
         pct1 = 100 * norm.cdf((2 * z0 + zalpha))
         pct2 = 100 * norm.cdf((2 * z0 - zalpha))
-        print("Testing... ({:.2f},{:.2f})".format(pct1, pct2))
         tprs_ib_low = np.percentile(tpr_boot, pct1, axis=0)
         tprs_ib_upp = np.percentile(tpr_boot, pct2, axis=0)
+    elif parametric is 'test3':
+        print("Using AUC for lower. Mirror upper.")
+        # Lets do a proper bias-correct based on AUC
+        auc_boot = auc_ib
+        auc_stat = auc_ib_mid
+        nboot = len(auc_boot)
+        zalpha = norm.ppf(0.05 / 2)
+        obs = auc_stat  # Observed mean
+        meansum = 0
+        for j in range(len(auc_boot)):
+            if auc_boot[j] >= obs:
+                meansum = meansum + 1
+        prop = meansum / nboot  # Proportion of times boot mean > obs mean
+        z0 = -norm.ppf(prop)
+        # new alpha
+        pct1 = 100 * norm.cdf((2 * z0 + zalpha))
+        pct2 = 100 * norm.cdf((2 * z0 - zalpha))
+        tprs_ib_low = np.percentile(tpr_boot, pct1, axis=0)
+        tprs_ib_upp = np.percentile(tpr_boot, pct2, axis=0)
+
+        low = tprs_ib_mid - tprs_ib_low
+        tprs_ib_upp = tprs_ib_mid + low
+        tprs_ib_upp[tprs_ib_upp > 1] = 1
+        tprs_ib_upp[tprs_ib_upp_old >= 1] = 1
+
+        tprs_ib_upp[tprs_ib_upp > 1] = 1
+        tprs_ib_upp[tprs_ib_upp_old >= 1] = 1
+
+        # Never go down
+        for i in range(len(tprs_ib_upp)):
+            if i > 1:
+                if tprs_ib_upp[i] < tprs_ib_upp[i - 1]:
+                    tprs_ib_upp[i] = tprs_ib_upp[i - 1]
+
+
+    elif parametric is 'null':
+        pass
     elif parametric is 'test2':
-
-        fpr_new, stat, _ = metrics.roc_curve(Y, stat, pos_label=pos, drop_intermediate=True)
-        idx_new = []
-        for j in fpr_new:
-            x = min(range(len(fpr_linspace)), key=lambda i: abs(fpr_linspace[i]-j))
-            idx_new.append(x)
-
-        fpr_linspace_ib = fpr_new
+        print("Using AUC.")
+        # Lets do a proper bias-correct based on AUC
+        auc_boot = auc_ib
+        auc_stat = auc_ib_mid
+        nboot = len(auc_boot)
+        zalpha = norm.ppf(0.05 / 2)
+        obs = auc_stat  # Observed mean
+        meansum = 0
+        for j in range(len(auc_boot)):
+            if auc_boot[j] >= obs:
+                meansum = meansum + 1
+        prop = meansum / nboot  # Proportion of times boot mean > obs mean
+        z0 = -norm.ppf(prop)
+        # new alpha
+        pct1 = 100 * norm.cdf((2 * z0 + zalpha))
+        pct2 = 100 * norm.cdf((2 * z0 - zalpha))
+        print("Testing... Upper/Lower CI({:.2f},{:.2f})".format(pct1, pct2))
+        tprs_ib_low = np.percentile(tpr_boot, pct1, axis=0)
+        tprs_ib_upp = np.percentile(tpr_boot, pct2, axis=0)
+    elif parametric is 'test':
+        print("At each vertical point in ROC Curve.")
+        #fpr_new, stat, _ = metrics.roc_curve(Y, stat, pos_label=pos, drop_intermediate=True)
+        # idx_new = []
+        # for j in fpr_new:
+        #     x = min(range(len(fpr_linspace)), key=lambda i: abs(fpr_linspace[i]-j))
+        #     idx_new.append(x)
+        stat = tprs_train
+        #fpr_linspace_ib = fpr_linspace
         bootstat = []
         for i in tpr_boot:
-            bootstat.append(i[idx_new])
+            bootstat.append(i)
         bootstat = np.array(bootstat)
         bootstat = bootstat.T
         nboot = len(bootstat)
@@ -184,6 +243,11 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
         Yscore_res = bootstat_oob[i]
         Ytrue = Y[bootidx_oob[i]]
         fpr_res, tpr_res, threshold_res = metrics.roc_curve(Ytrue, Yscore_res, pos_label=pos, drop_intermediate=False)
+        aucs = metrics.auc(fpr_res, tpr_res)
+        # Flip if wrong
+        if aucs < 0.5:
+            fpr_res, tpr_res, threshold_res = metrics.roc_curve(Ytrue, Yscore_res, pos_label=abs(pos-1), drop_intermediate=False)
+
         auc_oob.append(metrics.auc(fpr_res, tpr_res))
 
         # Drop intermediates when fpr=0
@@ -231,12 +295,14 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
 
     fig = figure(title="", plot_width=width, plot_height=height, x_axis_label=xlabel, y_axis_label=ylabel, x_range=(-0.06, 1.06), y_range=(-0.06, 1.06))
     fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=4, legend="Equal Distribution Line")
-    figline = fig.line("x", "y", color="green", line_width=4, alpha=0.6, legend="IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib_mid,auc_ib_ci), source=source)
-    fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ("AUC", "@auc_ib_med_hover{1.111} (+/- @auc_ib_ci_hover{1.111})")]))
 
-    # Figure: add 95CI band
-    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
-    fig.add_layout(figband)
+    if plot_num in [0,1,2,4]:
+        figline = fig.line("x", "y", color="green", line_width=4, alpha=0.6, legend="IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib_mid,auc_ib_ci), source=source)
+        fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ("AUC", "@auc_ib_med_hover{1.111} (+/- @auc_ib_ci_hover{1.111})")]))
+
+        # Figure: add 95CI band
+        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="green", source=source)
+        fig.add_layout(figband)
 
         # specificity and ci-interval for HoverTool
     spec2 = 1 - fpr_linspace
@@ -246,12 +312,13 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
 
     source2 = ColumnDataSource(data=data2)
 
-    figline2 = fig.line("x", "y", color="orange", line_width=4, alpha=0.6, legend="OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob_medci, auc_oob_ci), source=source2)
-    fig.add_tools(HoverTool(renderers=[figline2], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ("AUC", "@auc_oob_med_hover{1.111} (+/- @auc_oob_ci_hover{1.111})")]))
+    if plot_num in [0,1,3,4]:
+        figline2 = fig.line("x", "y", color="orange", line_width=4, alpha=0.6, legend="OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob_medci, auc_oob_ci), source=source2)
+        fig.add_tools(HoverTool(renderers=[figline2], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ("AUC", "@auc_oob_med_hover{1.111} (+/- @auc_oob_ci_hover{1.111})")]))
 
-    # Figure: add 95CI band
-    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="orange", source=source2)
-    fig.add_layout(figband)
+        # Figure: add 95CI band
+        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="orange", source=source2)
+        fig.add_layout(figband)
 
 
     fig.legend.location = "bottom_right"
@@ -262,7 +329,7 @@ def roc_plot_boot2(ypred_ib, ypred_oob, Y, bootstat, bootidx, bootstat_oob, boot
     return fig
 
 
-def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", show_title=True, title_font_size="13pt", title=""):
+def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", show_title=True, title_font_size="13pt", title="", plot_num=0):
 
     auc_check = roc_auc_score(Ytrue, Y_predfull)
     if auc_check > 0.5:
@@ -283,9 +350,11 @@ def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Sp
 
     # Figure: add line
     fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal Distribution Line")
-    figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="FULL (AUC = {:.2f})".format(auc_full), source=source)
-    fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111}"), ("AUC", "@aucfull")]))
-
+    if plot_num in [0,1,2,4]:
+        figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="FULL (AUC = {:.2f})".format(auc_full), source=source)
+        fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111}"), ("AUC", "@aucfull")]))
+    else:
+        pass
     # ADD CV
     # bootstrap using vertical averaging
 
@@ -345,13 +414,15 @@ def roc_plot_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Sp
 
     source2 = ColumnDataSource(data=data2)
 
-    figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.6, legend="CV (AUC = {:.2f} +/- {:.2f})".format(auc_medci, auc_ci,), source=source2)
-    fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ("AUC", "@auc_med_hover{1.111} (+/- @auc_ci_hover{1.111})")]))
+    if plot_num in [0,1,3,4]:
+        figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.6, legend="CV (AUC = {:.2f} +/- {:.2f})".format(auc_medci, auc_ci,), source=source2)
+        fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ("AUC", "@auc_med_hover{1.111} (+/- @auc_ci_hover{1.111})")]))
 
-    # Figure: add 95CI band
-    figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="orange", source=source2)
-    fig.add_layout(figband)
-
+        # Figure: add 95CI band
+        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="orange", source=source2)
+        fig.add_layout(figband)
+    else:
+        pass
     # Change font size
     if show_title is True:
         fig.title.text = "AUC FULL ({}) & AUC CV ({} +/- {})".format(np.round(auc_full,2), np.round(auc_medci,2), np.round(auc_ci,2))

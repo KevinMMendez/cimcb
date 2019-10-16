@@ -221,7 +221,7 @@ class BC(BaseBootstrap):
         output_notebook()
         show(fig)
 
-    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True):
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True, orthog_line=False):
         bootx = 1
         num_x_scores = len(self.stat['model.x_scores_'].T)
 
@@ -243,18 +243,18 @@ class BC(BaseBootstrap):
         if legend is "roc":
             legend_roc = True
 
-        if plot == "ci":
-            scatter_show = 0
-        elif plot == "innerci":
-            scatter_show = 1
-        elif plot == "ib":
-            scatter_show = 2
-        elif plot == "oob":
-            scatter_show = 3
-        elif plot == "all":
-            scatter_show = 4
+        if plot in ["ci", "CI"]:
+            plot_num = 0
+        elif plot in ["innerci", "MeanCI", "meanci"]:
+            plot_num = 1
+        elif plot in ["ib", "IB"]:
+            plot_num = 2
+        elif plot in ["oob", "OOB"]:
+            plot_num = 3
+        elif plot in ["all", "ALL", "All"]:
+            plot_num = 4
         else:
-            raise ValueError("plot has to be either 'ci', 'innerci', 'ib', 'oob', 'all'.")
+            raise ValueError("plot has to be either 'ci', 'meanci', 'ib', 'oob', 'all'.")
 
         if self.name == 'cimcb.model.NN_SigmoidSigmoid':
             lv_name = "Neuron"
@@ -272,8 +272,9 @@ class BC(BaseBootstrap):
         y_loadings_all = []
         for i in range(len(self.bootidx_oob)):
             val = self.bootstat_oob['model.y_loadings_'][i]
-            y_loadings_all.append(val)
-        y_loadings_ = np.median(y_loadings_all, 0)[0]
+            y_loadings_all.append(list(val[0]))
+        y_loadings_ = np.median(y_loadings_all, 0)
+        y_loadings_all = np.array(y_loadings_all)
 
         # OOB
         x_loc_oob_dict = {k: [] for k in range(len(self.Y))}
@@ -313,6 +314,18 @@ class BC(BaseBootstrap):
         x_scores_bc = np.array(x_scores_bc)
         x_scores_bc = x_scores_bc.T
 
+        # Sort by pctvar_
+        order = np.argsort(pctvar_)[::-1]
+        #order = [0,1]
+        x_scores_bc = x_scores_bc[:, order]
+        x_scores_ = x_scores_[:, order]
+        x_scores_ib = x_scores_ib[:, order]
+        x_scores_oob = x_scores_oob[:, order]
+        pctvar_ = pctvar_[order]
+        y_loadings_ = y_loadings_[order]
+        y_loadings_all = y_loadings_all[:, order]
+        self.y_loadings_all = y_loadings_all
+
         if num_x_scores == 1:
             pass
         else:
@@ -320,7 +333,7 @@ class BC(BaseBootstrap):
                 x_scores_full = x_scores_ib
             else:
                 x_scores_full = x_scores_
-            #x_scores_full = x_scores_bc
+            x_scores_orig = x_scores_
             x_scores_cv = x_scores_oob
 
             comb_x_scores = list(combinations(range(num_x_scores), 2))
@@ -338,7 +351,7 @@ class BC(BaseBootstrap):
                 # Make a copy (as it overwrites the input label/group)
                 if label is None:
                     group_copy = self.Y.copy()
-                    label_copy = pd.Series(self.Y)
+                    label_copy = pd.Series(self.Y, name='Class').apply(str)
                 else:
                     newlabel = np.array(label)
                     label_copy = deepcopy(label)
@@ -356,7 +369,23 @@ class BC(BaseBootstrap):
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
 
-                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
+                x_full = x_scores_full[:, x].tolist()
+                y_full = x_scores_full[:, y].tolist()
+                x_cv = x_scores_cv[:, x].tolist()
+                y_cv = x_scores_cv[:, y].tolist()
+                x_orig = x_scores_orig[:, x].tolist()
+                y_orig = x_scores_orig[:, y].tolist()
+
+                # Checking if flip.. do later
+                # grad_all = self.y_loadings_all[:, y] / self.y_loadings_all[:, x]
+                # flip_list = []
+                # for i in range(len(x_full)):
+                #     if np.sign(y_loadings_all[i, y]) != np.sign(y_loadings_[y]):
+                #         if np.sign(y_loadings_all[i, x]) != np.sign(y_loadings_[x]):
+                #             flip_list.append(i)
+
+                gradient = y_loadings_[y] / y_loadings_[x]
+                grid[y, x] = scatter_ellipse(x_orig, y_orig, x_cv, y_cv, label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_cv, extraci95_y=y_cv, extraci95=True, scattershow=plot_num, extraci95_x2=x_full, extraci95_y2=y_full, orthog_line=orthog_line)
 
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
@@ -368,30 +397,38 @@ class BC(BaseBootstrap):
             for i in range(num_x_scores):
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
                 xlabel = "{} {} ({:0.1f}%)".format(lv_name, i + 1, pctvar_[i])
-                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, legend=legend_dist, group_label=dist_label)
+                grid[i, i] = distribution(score_dist, group=group_dist, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, legend=legend_dist, group_label=dist_label, plot_num=plot_num)
 
             # Append each roc curve
             for i in range(len(comb_x_scores)):
                 x, y = comb_x_scores[i]
-
+                idx_x = order[x]
+                idx_y = order[y]
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
                 gradient = y_loadings_[y] / y_loadings_[x]
                 theta = math.atan(gradient)
-                x_rotate_stat = self.stat['model.x_scores_'][:, x] * math.cos(theta) + self.stat['model.x_scores_'][:, y] * math.sin(theta)
+                x_rotate_stat = self.stat['model.x_scores_'][:, idx_x] * math.cos(theta) + self.stat['model.x_scores_'][:, idx_y] * math.sin(theta)
+
                 x_rotate_ib = []
-                for i in self.bootstat['model.x_scores_']:
-                    val = i[:, x] * math.cos(theta) + i[:, y] * math.sin(theta)
+                for i in range(len(self.bootstat['model.x_scores_'])):
+                    grad = y_loadings_all[i][y] / y_loadings_all[i][x]
+                    theta = math.atan(grad)
+                    j = self.bootstat['model.x_scores_'][i]
+                    val = j[:, idx_x] * math.cos(theta) + j[:, idx_y] * math.sin(theta)
                     x_rotate_ib.append(val)
 
                 x_rotate_oob = []
-                for i in self.bootstat_oob['model.x_scores_']:
-                    val = i[:, x] * math.cos(theta) + i[:, y] * math.sin(theta)
+                for i in range(len(self.bootstat_oob['model.x_scores_'])):
+                    grad = y_loadings_all[i][y] / y_loadings_all[i][x]
+                    theta = math.atan(grad)
+                    j = self.bootstat_oob['model.x_scores_'][i]
+                    val = j[:, idx_x] * math.cos(theta) + j[:, idx_y] * math.sin(theta)
                     x_rotate_oob.append(val)
 
                 # x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
                 # x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
                 Y = self.Y
-                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, width=width_height, height=width_height, xlabel="1-Specificity (LV{}{}/LV{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), label_font_size=label_font, parametric=bc, bc=True, legend=legend_roc)
+                grid[x, y] = roc_plot_boot2(Y, Y, Y, x_rotate_ib, self.bootidx, x_rotate_oob, self.bootidx_oob, x_rotate_stat, width=width_height, height=width_height, xlabel="1-Specificity (LV{}{}/LV{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), label_font_size=label_font, parametric=bc, bc=True, legend=legend_roc, plot_num=plot_num)
 
                 # self.x_rotate = x_rotate
                 # self.Y = group_copy
@@ -446,7 +483,7 @@ class BC(BaseBootstrap):
             name_vip = "Feature Importance: Garlson's Algorithm"
         else:
             name_coef = "Coefficient Plot"
-            name_vip = "Variable Importance in Projection (VIP)"
+            name_vip = "Variable Importance in Projection (VIP) Plot"
 
         # Remove rows from PeakTable if not in peaklist
         if peaklist is not None:

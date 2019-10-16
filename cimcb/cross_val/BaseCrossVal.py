@@ -100,7 +100,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot_projections(self, components="all", label=None, size=12, scatter2=False, legend="all", plot="ci", meanfull=True, roc_title=False, **kwargs):
+    def plot_projections(self, components="all", label=None, size=12, scatter2=False, legend="all", plot="ci", meanfull=True, roc_title=False, orthog_line=False, **kwargs):
 
         if components == "all":
             components = None
@@ -139,18 +139,18 @@ class BaseCrossVal(ABC):
         # else:
         #     raise ValueError("scatter has to be either 'None', 'Inner', 'Full', 'CV', 'All'")
 
-        if plot == "ci":
-            scatter_show = 0
-        elif plot == "innerci":
-            scatter_show = 1
-        elif plot == "full":
-            scatter_show = 2
-        elif plot == "cv":
-            scatter_show = 3
-        elif plot == "all":
-            scatter_show = 4
+        if plot in ["ci", "CI"]:
+            plot_num = 0
+        elif plot in ["innerci", "MeanCI", "meanci"]:
+            plot_num = 1
+        elif plot in ["full", "FULL", "Full"]:
+            plot_num = 2
+        elif plot in ["CV", "cv", "Cv"]:
+            plot_num = 3
+        elif plot in ["all", "ALL", "All"]:
+            plot_num = 4
         else:
-             raise ValueError("plot has to be either 'ci', 'innerci', 'full', 'cv', 'all'.")
+            raise ValueError("plot has to be either 'ci', 'meanci', 'full', 'cv', 'all'.")
 
 
 
@@ -206,6 +206,12 @@ class BaseCrossVal(ABC):
             if i > num_x_scores:
                 raise ValueError("Component {} does not exist.".format(i))
 
+        order = np.argsort(pctvar_)[::-1]
+        y_loadings_ = y_loadings_[order]
+        x_scores_full = x_scores_full[:, order]
+        x_scores_cv = x_scores_cv[:, order]
+        pctvar_ = pctvar_[order]
+
         # If there is only 1 x_score, Need to plot x_score vs. peak (as opposided to x_score[i] vs. x_score[j])
         if num_x_scores == 1:
             pass
@@ -223,7 +229,7 @@ class BaseCrossVal(ABC):
                 # Make a copy (as it overwrites the input label/group)
                 if label is None:
                     group_copy = self.Y.copy()
-                    label_copy = pd.Series(self.Y)
+                    label_copy = pd.Series(self.Y, name='Class').apply(str)
                 else:
                     newlabel = np.array(label)
                     label_copy = deepcopy(label)
@@ -235,12 +241,23 @@ class BaseCrossVal(ABC):
                 xlabel = "{} {} ({:0.1f}%)".format(lv_name, x + 1, pctvar_[x])
                 ylabel = "{} {} ({:0.1f}%)".format(lv_name, y + 1, pctvar_[y])
                 gradient = y_loadings_[y] / y_loadings_[x]
+
+                x_full = x_scores_full[:, x].tolist()
+                y_full = x_scores_full[:, y].tolist()
+                x_cv = x_scores_cv[:, x].tolist()
+                y_cv = x_scores_cv[:, y].tolist()
+                x_orig = x_scores_full[:, x].tolist()
+                y_orig = x_scores_full[:, y].tolist()
+
                 max_range = max(np.max(np.abs(x_scores_full[:, x])), np.max(np.abs(x_scores_cv[:, y])))
                 new_range_min = -max_range - 0.05 * max_range
                 new_range_max = max_range + 0.05 * max_range
                 new_range = (new_range_min, new_range_max)
+                new_xrange = new_range
+                new_yrange = new_range
 
-                grid[y, x] = scatter_ellipse(x_scores_full[:, x].tolist(), x_scores_full[:, y].tolist(), x_scores_cv[:, x].tolist(), x_scores_cv[:, y].tolist(), label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_range, yrange=new_range, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_scores_cv[:, x].tolist(), extraci95_y=x_scores_cv[:, y].tolist(), extraci95=True, scattershow=scatter_show)
+                grid[y, x] = scatter_ellipse(x_orig, y_orig, x_cv, y_cv, label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_xrange, yrange=new_yrange, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_cv, extraci95_y=y_cv, extraci95=True, scattershow=plot_num, extraci95_x2=x_full, extraci95_y2=y_full, orthog_line=orthog_line)
+
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
             dist_label1 = np.array(label_copy[self.Y==0])[0]
@@ -251,11 +268,13 @@ class BaseCrossVal(ABC):
                 i = i - 1
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
                 xlabel = "{} {} ({:0.1f}%)".format(lv_name, i + 1, pctvar_[i])
-                grid[i, i] = distribution(score_dist, group=group_dist, group_label=dist_label, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid, legend=legend_dist)
+                grid[i, i] = distribution(score_dist, group=group_dist, group_label=dist_label, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid, legend=legend_dist, plot_num=plot_num)
 
             # Append each roc curve
             for i in range(len(comb_x_scores)):
                 x, y = comb_x_scores[i]
+                idx_x = order[x]
+                idx_y = order[y]
 
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
                 # theta = math.atan(1)
@@ -268,7 +287,7 @@ class BaseCrossVal(ABC):
                 group_copy = self.Y.copy()
                 self.x_rotate_boot = []
                 for i in range(len(x_scores_cvall)):
-                    x_rot = x_scores_cvall[i][:, x] * math.cos(theta) + x_scores_cvall[i][:, y] * math.sin(theta)
+                    x_rot = x_scores_cvall[i][:, idx_x] * math.cos(theta) + x_scores_cvall[i][:, idx_y] * math.sin(theta)
                     self.x_rotate_boot.append(x_rot)
                 self.x_rotate_boot = np.array(self.x_rotate_boot)
                 x_rotate_boot = self.x_rotate_boot
@@ -278,7 +297,7 @@ class BaseCrossVal(ABC):
 
                 # grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
 
-                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), legend=legend_roc, label_font_size=label_font, title_font_size=title_font, show_title=roc_title)
+                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), legend=legend_roc, label_font_size=label_font, title_font_size=title_font, show_title=roc_title, plot_num=plot_num)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())

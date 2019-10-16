@@ -17,6 +17,9 @@ class permutation_test():
     def __init__(self, model, params, X, Y, nperm=100, folds=5):
         self.model = locate(model.__name__)
         self.params = params
+        # if seed is set, make sure it's none
+        if 'seed' in self.params:
+            params['seed'] = None
         self.skf = StratifiedKFold(n_splits=folds)
         self.folds = folds
         self.X = X
@@ -101,7 +104,7 @@ class permutation_test():
         self._calc_original()
         self._calc_perm()
 
-    def plot(self, metric="r2q2"):
+    def plot(self, metric="r2q2", hide_pval=True):
 
         # Choose metric to plot
         metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
@@ -138,10 +141,13 @@ class permutation_test():
         r2yintercept = stats_r2[0] - r2gradient
         q2yintercept = stats_q2[0] - q2gradient
 
+        max_vals = max(np.max(stats_r2), np.max(stats_q2))
+        min_vals = min(np.min(stats_r2), np.min(stats_q2))
+        y_range_share = (min_vals - abs(0.2 * min_vals), max_vals + abs(0.1 * min_vals))
         # Figure 1
         data = {"corr": stats_corr, "r2": stats_r2, "q2": stats_q2}
         source = ColumnDataSource(data=data)
-        fig1 = figure(plot_width=470, plot_height=410, x_range=(-0.15, 1.15), x_axis_label="Correlation", y_axis_label=full_text + " & " + cv_text)
+        fig1 = figure(plot_width=470, plot_height=410, x_range=(-0.15, 1.15), x_axis_label="Correlation", y_range=y_range_share, y_axis_label=full_text + " & " + cv_text)
         # Lines
         r2slope = Slope(gradient=r2gradient, y_intercept=r2yintercept, line_color="black", line_width=2, line_alpha=0.3)
         q2slope = Slope(gradient=q2gradient, y_intercept=q2yintercept, line_color="black", line_width=2, line_alpha=0.3)
@@ -182,7 +188,7 @@ class permutation_test():
         x2_pdf_grid = [-x for x in x2_pdf_grid]
 
         # Figure 2
-        fig2 = figure(plot_width=470, plot_height=410, x_range=(min(x2_grid) * 1.1, max(stats_r2[0], max(x1_grid)) + 0.65), y_range=((min(x2_pdf_grid) - 1) * 1.2, (max(x1_pdf_grid) + 1) * 1.1), x_axis_label=full_text + " & " + cv_text, y_axis_label="p.d.f.")
+        fig2 = figure(plot_width=470, plot_height=410, x_axis_label=full_text + " & " + cv_text, y_axis_label="p.d.f.", x_range=y_range_share)
         slope_0 = Span(location=0, dimension="width", line_color="black", line_width=2, line_alpha=0.3)
         fig2.add_layout(slope_0)
 
@@ -232,17 +238,19 @@ class permutation_test():
         q2fig2_line = fig2.line("x", "y", line_width=3, line_color="blue", source=source3_line)
         q2fig2 = fig2.circle("x", "y", fill_color="blue", size=8, legend=cv_text, source=source3)
 
-        # Add text
-        textr2 = "True " + full_text + "\nP-Value: {}".format(data2_manu)
-        textq2 = "True " + cv_text + "\nP-Value: {}".format(data3_manu)
-        fig2.text(x=[stats_r2[0] + 0.05, stats_q2[0] + 0.05], y=[(max(x1_pdf_grid) + 0.5), (min(x2_pdf_grid) - 1.5)], text=[textr2, textq2], angle=0, text_font_size="8pt")
+        if hide_pval == False:
+            # Add text
+            textr2 = "True " + full_text + "\nP-Value: {}".format(data2_manu)
+            textq2 = "True " + cv_text + "\nP-Value: {}".format(data3_manu)
+            fig2.text(x=[stats_r2[0] + 0.05, stats_q2[0] + 0.05], y=[(max(x1_pdf_grid) + 0.5), (min(x2_pdf_grid) - 1.5)], text=[textr2, textq2], angle=0, text_font_size="8pt")
 
         # Font-sizes
         fig1.xaxis.axis_label_text_font_size = "13pt"
         fig1.yaxis.axis_label_text_font_size = "13pt"
         fig2.xaxis.axis_label_text_font_size = "12pt"
         fig2.yaxis.axis_label_text_font_size = "12pt"
-        #fig2.legend.location = "top_left"
+        fig1.legend.location = "bottom_right"
+        fig2.legend.location = "top_left"
         fig1.legend.visible = True
         fig2.legend.visible = True
 

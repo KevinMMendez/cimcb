@@ -3,7 +3,7 @@ from scipy import stats
 from bokeh.plotting import figure
 
 
-def distribution(X, group, kde=True, title="Density Plot", group_label=None, xlabel="x", ylabel="Pr(x)", font_size="20pt", label_font_size="13pt", width=500, height=400, color_hist="green", color_kde="mediumturquoise", padding=0.5, smooth=None, sigmoid=False, legend=False, legend_location="top_right"):
+def distribution(X, group, kde=True, title="Density Plot", group_label=None, xlabel="x", ylabel="Pr(x)", font_size="20pt", label_font_size="13pt", width=500, height=400, color_hist="green", color_kde="mediumturquoise", padding=0.5, smooth=None, sigmoid=False, legend=False, legend_location="top_right", plot_num=0):
     """Creates a distribution plot using Bokeh.
 
     Required Parameters
@@ -126,10 +126,17 @@ def distribution(X, group, kde=True, title="Density Plot", group_label=None, xla
     fig = figure(title=title, x_axis_label=xlabel, y_axis_label=ylabel, plot_width=width, plot_height=height, x_range=new_x_range, y_range=new_y_range)
     if kde is True:
         if len(group_unique) == 4:
-            fig.patch(x1_grid, x1_pdf_grid, alpha=0.1, color="red", line_color="grey", line_width=1, legend=group_label[0])
-            fig.patch(x2_grid, x2_pdf_grid, alpha=0.1, color="blue", line_color="grey", line_width=1, legend=group_label[1])
-            fig.patch(x3_grid, x3_pdf_grid, alpha=0.2, color="red", line_color="grey", line_width=1)
-            fig.patch(x4_grid, x4_pdf_grid, alpha=0.2, color="blue", line_color="grey", line_width=1)
+            if plot_num is 2:
+                fig.patch(x1_grid, x1_pdf_grid, alpha=0.28, color="red", line_color="grey", line_width=1, legend=group_label[0])
+                fig.patch(x2_grid, x2_pdf_grid, alpha=0.28, color="blue", line_color="grey", line_width=1, legend=group_label[1])
+            elif plot_num is 3:
+                fig.patch(x3_grid, x3_pdf_grid, alpha=0.28, color="red", line_color="grey", line_width=1, legend=group_label[0])
+                fig.patch(x4_grid, x4_pdf_grid, alpha=0.28, color="blue", line_color="grey", line_width=1, legend=group_label[1])
+            else:
+                fig.patch(x1_grid, x1_pdf_grid, alpha=0.16, color="red", line_color="grey", line_width=1, legend=group_label[0])
+                fig.patch(x2_grid, x2_pdf_grid, alpha=0.16, color="blue", line_color="grey", line_width=1, legend=group_label[1])
+                fig.patch(x3_grid, x3_pdf_grid, alpha=0.16, color="red", line_color="grey", line_width=1)
+                fig.patch(x4_grid, x4_pdf_grid, alpha=0.16, color="blue", line_color="grey", line_width=1)
         else:
             fig.patch(x1_grid, x1_pdf_grid, alpha=0.3, color="red", line_color="grey", line_width=1, legend=group_label[0])
             fig.patch(x2_grid, x2_pdf_grid, alpha=0.3, color="blue", line_color="grey", line_width=1, legend=group_label[1])

@@ -84,7 +84,7 @@ class BaseModel(ABC):
     #     self.boot = boot
     #     self.bootci = self.boot.run()
 
-    def permutation_test(self, metric='r2q2', nperm=100, folds=5):
+    def permutation_test(self, metric='r2q2', nperm=100, folds=5, hide_pval=True):
         """Plots permutation test figures.
 
         Parameters
@@ -95,13 +95,13 @@ class BaseModel(ABC):
         params = self.__params__
         perm = permutation_test(self, params, self.X, self.Y, nperm=nperm, folds=folds)
         perm.run()
-
+        self.perm = perm
         if type(metric) != list:
-            fig = perm.plot(metric=metric)
+            fig = perm.plot(metric=metric, hide_pval=hide_pval)
         else:
             fig_list = []
             for i in metric:
-                fig_i = perm.plot(metric=i)
+                fig_i = perm.plot(metric=i, hide_pval=hide_pval)
                 fig_list.append([fig_i])
             fig = layout([[fig_list]])
 

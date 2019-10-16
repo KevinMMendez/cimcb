@@ -3,7 +3,6 @@ from keras.callbacks import Callback
 from keras.optimizers import SGD
 from keras.models import Sequential
 from keras.layers import Dense
-import tensorflow as tf
 from scipy.stats import logistic
 from copy import deepcopy, copy
 from sklearn.metrics import r2_score, explained_variance_score
@@ -39,7 +38,7 @@ class NN_SigmoidSigmoid(BaseModel):
         self.compiled = False
         self.seed = seed
         self.__name__ = 'cimcb.model.NN_SigmoidSigmoid'
-        self.__params__ = {'n_neurons': n_neurons, 'epochs': epochs, 'learning_rate': learning_rate, 'momentum': momentum, 'decay': decay, 'nesterov': nesterov, 'loss': loss, 'batch_size': batch_size, 'verbose': verbose}
+        self.__params__ = {'n_neurons': n_neurons, 'epochs': epochs, 'learning_rate': learning_rate, 'momentum': momentum, 'decay': decay, 'nesterov': nesterov, 'loss': loss, 'batch_size': batch_size, 'verbose': verbose, 'seed': seed}
 
     def set_params(self, params):
         self.__init__(**params)
@@ -126,14 +125,15 @@ class NN_SigmoidSigmoid(BaseModel):
         # Sort by pctvar
         # if self.compiled == False:
         #     if w1 == False:
-        #         order = np.argsort(self.model.pctvar_)[::-1]
-        #         self.model.x_scores_ = self.model.x_scores_[:, order]
-        #         self.model.x_loadings_ = self.model.x_loadings_[:, order]
-        #         self.model.y_loadings_ = self.model.y_loadings_[order]
-        #         self.model.y_loadings_ = self.model.y_loadings_.T
-        #         self.model.pctvar_ = self.model.pctvar_[order]
-        #         self.model.w1[0] = self.model.w1[0][:, order]
-        #         self.model.w2[0] = self.model.w2[0][order]
+        #         if w2 == False:
+        #             order = np.argsort(self.model.pctvar_)[::-1]
+        #             self.model.x_scores_ = self.model.x_scores_[:, order]
+        #             self.model.x_loadings_ = self.model.x_loadings_[:, order]
+        #             self.model.y_loadings_ = self.model.y_loadings_[order]
+        #             self.model.y_loadings_ = self.model.y_loadings_.T
+        #             self.model.pctvar_ = self.model.pctvar_[order]
+        #             self.model.w1[0] = self.model.w1[0][:, order]
+        #             self.model.w2[0] = self.model.w2[0][order]
         #     self.compiled = True
 
         self.model.y_loadings_ = layer2_weight.T
@@ -213,38 +213,15 @@ def pctvar_calc(model, X, Y):
 
 
 def garson(A, B):
-    """
-    Computes Garson's algorithm
-    A = matrix of weights of input-hidden layer (rows=input & cols=hidden)
-    B = vector of weights of hidden-output layer
-    """
     B = np.diag(B)
-
-    # connection weight through the different hidden node
     cw = np.dot(A, B)
-
-    # weight through node (axis=0 is column; sum per input feature)
     cw_h = abs(cw).sum(axis=0)
-
-    # relative contribution of input neuron to outgoing signal of each hidden neuron
-    # sum to find relative contribution of input neuron
     rc = np.divide(abs(cw), abs(cw_h))
     rc = rc.sum(axis=1)
-
-    # normalize to 100% for relative importance
-    ri = rc / rc.sum()
-    return(ri)
+    #ri = rc / rc.sum()
+    return(rc)
 
 
 def connectionweight(A, B):
-    """
-    Computes Garson's algorithm
-    A = matrix of weights of input-hidden layer (rows=input & cols=hidden)
-    B = vector of weights of hidden-output layer
-    """
-    #B = np.diag(B)
-
-    # connection weight through the different hidden node
     cw = np.dot(A, B)
-
     return cw

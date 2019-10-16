@@ -93,6 +93,68 @@ class BaseBootstrap(ABC):
             for key, value in oob.items():
                 self.bootstat_oob[key].append(value[0])
 
+        # if self.name == 'cimcb.model.PLS_SIMPLS':
+        #     # Check if loadings flip
+        #     orig = self.stat['model.x_loadings_']
+        #     for i in range(len(self.bootstat['model.x_loadings_'])):
+        #         check = self.bootstat['model.x_loadings_'][i]
+        #         for j in range(len(orig.T)):
+        #             corr = np.corrcoef(orig[:, j], check[:, j])[1, 0]
+        #             if corr < 0:
+        #                 print("switched")
+        #                 for key, value in self.bootstat.items():
+        #                     if key == 'model.x_loadings_':
+        #                         value[i][:, j] = - value[i][:, j]
+        #                         self.bootstat[key] = value
+
+        #     for i in range(len(self.stat['model.x_loadings_'].T)):
+        #         for j in range(len(self.bootstat['model.x_loadings_'])):
+        #             bt = self.bootstat['model.x_loadings_'][j][:, i]
+        #             st = self.stat['model.x_loadings_'][:, i]
+        #             if np.corrcoef(bt, st)[1, 0] < 0:
+        #                 self.bootstat['model.x_loadings_'][j][:, i] = -1 * self.bootstat['model.x_loadings_'][j][:, i]
+        #                 print('switched')
+
+        # # if self.name == 'cimcb.model.PLS_NIPALS':
+        # #     # Check if Y loadings flip
+        #     orig = self.stat['model.y_loadings_'][0]
+        #     for i in range(len(self.bootstat['model.y_loadings_'])):
+        #         check = self.bootstat['model.y_loadings_'][i][0]
+        #         for j in range(len(orig)):
+        #             if np.sign(orig[j]) != np.sign(check[j]):
+        #                 for key, value in self.bootstat.items():
+        #                     if key == 'model.y_loadings_':
+        #                         value[i][0][j] = - value[i][0][j]
+        #                         self.bootstat[key] = value
+        #                 for key, value in self.bootstat.items():
+        #                     if key == 'model.y_loadings_oob':
+        #                         value[i][0][j] = - value[i][0][j]
+        #                         self.bootstat[key] = value
+                # for key, value in self.bootstat.items():
+                #     if key == 'model.x_scores_':
+                #         value[i][:, j] = - value[i][:, j]
+                #         self.bootstat[key] = value
+                # for key, value in self.bootstat.items():
+                #     if key == 'model.x_scores_oob':
+                #         value[i][:, j] = - value[i][:, j]
+                #         self.bootstat[key] = value
+                # a1 = deepcopy(self.bootstat['model.y_loadings_'][i][0][j])
+                # a1 = copy(a1)
+                # #a1 = -a1
+                # self.bootstat['model.y_loadings_'][i][0][j] = -a1
+
+                # a2 = deepcopy(self.bootstat_oob['model.y_loadings_'][i][0][j])
+                # a2 = copy(a2)
+                # self.bootstat_oob['model.y_loadings_'][i][0][j] = -a2
+
+                # a3 = deepcopy(self.bootstat['model.x_loadings_'][i][0:, j])
+                # a3 = copy(a3)
+                # self.bootstat['model.x_loadings_'][i][0:, j] = -a3
+
+                # a4 = deepcopy(self.bootstat_oob['model.x_loadings_'][i][0:, j])
+                # a4 = copy(a4)
+                # self.bootstat_oob['model.x_loadings_'][i][0:, j] = -a4
+
         # Stop timer
         stop = timeit.default_timer()
         self.parallel_time = (stop - start) / 60
@@ -125,6 +187,7 @@ class BaseBootstrap(ABC):
         model_i.test(X_res_oob)
         for j in self.bootlist:
             bootstatloop_oob[j].append(nested_getattr(model_i, j))
+
         return [bootstatloop, bootstatloop_oob]
 
     @abstractmethod

@@ -70,24 +70,6 @@ class kfold(BaseCrossVal):
             self.w1.append(full[i][4])
             self.w2.append(full[i][5])
 
-        # for i in tqdm(range(len(self.param_list)), desc="1/2"):
-        #     parami = self.param_list[i]
-        #     model_i = self.model(**parami)
-        #     # model_i.set_params(parami)
-        #     # Full
-        #     model_i.train(self.X, self.Y)
-        #     ypred_full_i = model_i.test(self.X)
-        #     self.ypred_full.append(ypred_full_i)
-        #     self.x_scores_full.append(model_i.model.x_scores_)
-        #     self.y_loadings_.append(model_i.model.y_loadings_)
-        #     self.pctvar_.append(model_i.model.pctvar_)
-        #     if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
-        #         self.w1.append(model_i.model.w1)
-        #         self.w2.append(model_i.model.w2)
-        #     else:
-        #         self.w1.append([0])
-        #         self.w2.append([0])
-
         self.loop_w1 = self.w1 * self.n_mc
         self.loop_w2 = self.w2 * self.n_mc
 
@@ -115,6 +97,8 @@ class kfold(BaseCrossVal):
         model_i = self.model(**parami)
         # model_i.set_params(parami)
         # Full
+        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+            model_i.compiled = False
         model_i.train(self.X, self.Y)
         ypred_full_i = model_i.test(self.X)
         ypred_full = ypred_full_i
@@ -136,14 +120,13 @@ class kfold(BaseCrossVal):
         model_i = self.model()
         model_i.set_params(params_i)
         # Full
-        model_i.train(self.X, self.Y)
         if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
             model_i.train(self.X, self.Y, w1=self.loop_w1[i], w2=self.loop_w2[i])
         else:
             model_i.train(self.X, self.Y)
-
+        model_i.compiled = True
         # CV (for each fold)
-        ypred_cv_i, x_scores_cv = self._calc_cv_ypred(model_i, self.X, self.Y)
+        ypred_cv_i, x_scores_cv = self._calc_cv_ypred(model_i, self.X, self.Y, w1=self.loop_w1[i], w2=self.loop_w2[i])
         ypred_cv = ypred_cv_i
         return [ypred_cv_i, x_scores_cv]
 
@@ -199,17 +182,22 @@ class kfold(BaseCrossVal):
             self.table_std = self.table_std.reindex(index=np.sort(self.table_std.index))
         return self.table
 
-    def _calc_cv_ypred(self, model_i, X, Y):
+    def _calc_cv_ypred(self, model_i, X, Y, w1, w2):
         """Method used to calculate ypred cv."""
         ypred_cv_i = [None] * len(Y)
         x_scores_cv_i = [None] * len(Y)
-
+        np.random.seed(seed=None)
         if len(X) == len(Y):
             for train, test in self.crossval_idx.split(X, Y):
                 X_train = X[train, :]
                 Y_train = Y[train]
                 X_test = X[test, :]
-                model_i.train(X_train, Y_train)
+                if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+                    model_i.compiled = True
+                    model_i.train(X_train, Y_train, w1=w1, w2=w2)
+                else:
+                    model_i.train(X_train, Y_train)
+
                 ypred_cv_i_j = model_i.test(X_test)
                 # Return value to y_pred_cv in the correct position # Better way to do this
                 for (idx, val) in zip(test, ypred_cv_i_j):
