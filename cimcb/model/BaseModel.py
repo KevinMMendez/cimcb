@@ -18,8 +18,7 @@ from bokeh.plotting import ColumnDataSource, figure, output_notebook, show
 from scipy import interp
 from sklearn import metrics
 from sklearn.utils import resample
-from ..bootstrap import Perc, BC, BCA
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_plot, roc_calculate_boot, roc_plot_boot
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_boot
 from ..utils import binary_metrics, dict_mean, dict_median
 
 
@@ -63,28 +62,7 @@ class BaseModel(ABC):
             raise ValueError("length of X does not match length of Y.")
         return X, Y
 
-    # def calc_bootci(self, bootnum=100, type="bca"):
-    #     """Calculates bootstrap confidence intervals based on bootlist.
-
-    #     Parameters
-    #     ----------
-    #     bootnum : a positive integer, (default 100)
-    #         The number of bootstrap samples used in the computation.
-
-    #     type : 'bc', 'bca', 'perc', (default 'bca')
-    #         Methods for bootstrap confidence intervals. 'bc' is bias-corrected bootstrap confidence intervals. 'bca' is bias-corrected and accelerated bootstrap confidence intervals. 'perc' is percentile confidence intervals.
-    #     """
-    #     bootlist = self.bootlist
-    #     if type is "bca":
-    #         boot = BCA(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-    #     if type is "bc":
-    #         boot = BC(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-    #     if type is "perc":
-    #         boot = Perc(self, self.X, self.Y, self.bootlist, bootnum=bootnum)
-    #     self.boot = boot
-    #     self.bootci = self.boot.run()
-
-    def permutation_test(self, metric='r2q2', nperm=100, folds=5, hide_pval=True):
+    def permutation_test(self, metric='r2q2', nperm=100, folds=5, hide_pval=True, grid_line=False, legend=True):
         """Plots permutation test figures.
 
         Parameters
@@ -97,11 +75,11 @@ class BaseModel(ABC):
         perm.run()
         self.perm = perm
         if type(metric) != list:
-            fig = perm.plot(metric=metric, hide_pval=hide_pval)
+            fig = perm.plot(metric=metric, hide_pval=hide_pval, grid_line=grid_line, legend=legend)
         else:
             fig_list = []
             for i in metric:
-                fig_i = perm.plot(metric=i, hide_pval=hide_pval)
+                fig_i = perm.plot(metric=i, hide_pval=hide_pval, legend=legend)
                 fig_list.append([fig_i])
             fig = layout([[fig_list]])
 

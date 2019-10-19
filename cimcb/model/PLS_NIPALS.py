@@ -8,7 +8,7 @@ from bokeh.plotting import output_notebook, show
 from bokeh.layouts import gridplot
 from bokeh.plotting import ColumnDataSource, figure
 from .BaseModel import BaseModel
-from ..plot import scatter, distribution, roc_calculate, roc_plot, boxplot
+from ..plot import scatter, distribution, boxplot
 from abc import ABC, abstractmethod, abstractproperty
 from sklearn.metrics import r2_score
 import numpy as np
@@ -27,8 +27,7 @@ from bokeh.plotting import ColumnDataSource, figure, output_notebook, show
 from scipy import interp
 from sklearn import metrics
 from sklearn.utils import resample
-from ..bootstrap import Perc, BC, BCA
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test
 from ..utils import binary_metrics
 
 

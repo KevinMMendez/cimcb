@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from sklearn import metrics
 from bokeh.layouts import gridplot, layout
 from bokeh import events
+from sklearn.linear_model import LinearRegression
 from bokeh.plotting import figure, output_notebook, show
 from bokeh.models import ColumnDataSource, Circle, HoverTool, TapTool, LabelSet, Rect, LinearColorMapper, MultiLine, Patch, Patches, CustomJS, Text, Title
 from itertools import product
@@ -14,8 +15,8 @@ from sklearn.model_selection import ParameterGrid
 from sklearn import preprocessing
 from itertools import combinations
 from copy import deepcopy
-from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_calculate, roc_plot, roc_calculate_boot, roc_plot_boot, roc_plot_cv, scatter_ellipse
-from ..utils import color_scale, dict_perc
+from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test, roc_cv, scatter_ellipse
+from ..utils import color_scale, dict_perc, nested_getattr, dict_95ci, dict_median_scores
 
 
 class BaseCrossVal(ABC):
@@ -100,7 +101,7 @@ class BaseCrossVal(ABC):
         self.calc_stats()
         print("Done!")
 
-    def plot_projections(self, components="all", label=None, size=12, scatter2=False, legend="all", plot="ci", meanfull=True, roc_title=False, orthog_line=False, **kwargs):
+    def plot_projections(self, components="all", label=None, size=12, scatter2=False, legend="all", plot="ci", meanfull=True, roc_title=False, orthog_line=True, grid_line=False, **kwargs):
 
         if components == "all":
             components = None
@@ -256,7 +257,11 @@ class BaseCrossVal(ABC):
                 new_xrange = new_range
                 new_yrange = new_range
 
-                grid[y, x] = scatter_ellipse(x_orig, y_orig, x_cv, y_cv, label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_xrange, yrange=new_yrange, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_cv, extraci95_y=y_cv, extraci95=True, scattershow=plot_num, extraci95_x2=x_full, extraci95_y2=y_full, orthog_line=orthog_line)
+                regY_full = self.Y
+                regX_full = np.array([x_full, y_full]).T
+                reg_stat = LinearRegression().fit(regX_full, regY_full)
+                #gradient = reg_stat.coef_[1] / reg_stat.coef_[0]
+                grid[y, x] = scatter_ellipse(x_orig, y_orig, x_cv, y_cv, label=label_copy, group=group_copy, title="", xlabel=xlabel, ylabel=ylabel, width=width_height, height=width_height, legend=legend_scatter, size=circle_size_scoreplot, label_font_size=label_font, hover_xy=False, xrange=new_xrange, yrange=new_yrange, gradient=gradient, ci95=True, scatterplot=scatterplot, extraci95_x=x_cv, extraci95_y=y_cv, extraci95=True, scattershow=plot_num, extraci95_x2=x_full, extraci95_y2=y_full, orthog_line=orthog_line, grid_line=grid_line, legend_title=True, font_size=label_font)
 
             # Append each distribution curve
             group_dist = np.concatenate((self.Y, (self.Y + 2)))
@@ -268,7 +273,7 @@ class BaseCrossVal(ABC):
                 i = i - 1
                 score_dist = np.concatenate((x_scores_full[:, i], x_scores_cv[:, i]))
                 xlabel = "{} {} ({:0.1f}%)".format(lv_name, i + 1, pctvar_[i])
-                grid[i, i] = distribution(score_dist, group=group_dist, group_label=dist_label, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid, legend=legend_dist, plot_num=plot_num)
+                grid[i, i] = distribution(score_dist, group=group_dist, group_label=dist_label, kde=True, title="", xlabel=xlabel, ylabel="p.d.f.", width=width_height, height=width_height, label_font_size=label_font, sigmoid=sigmoid, legend=legend_dist, plot_num=plot_num, grid_line=grid_line, legend_title=True, font_size=label_font)
 
             # Append each roc curve
             for i in range(len(comb_x_scores)):
@@ -278,10 +283,22 @@ class BaseCrossVal(ABC):
 
                 # Get the optimal combination of x_scores based on rotation of y_loadings_
                 # theta = math.atan(1)
-                gradient = y_loadings_[y] / y_loadings_[x]
-                theta = math.atan(gradient)
+
+                x_stat = x_scores_full[:, x]
+                y_stat = x_scores_full[:, y]
+                regY_stat = self.Y
+                regX_stat = np.array([x_stat, y_stat]).T
+                reg_stat = LinearRegression().fit(regX_stat, regY_stat)
+                grad_stat = reg_stat.coef_[1] / reg_stat.coef_[0]
+                theta = math.atan(grad_stat)
+                #ypred_stat = x_stat * math.cos(theta_stat) + y_stat * math.sin(theta_stat)  # Optimal line
                 x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
-                x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
+                #x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
+
+                # gradient = y_loadings_[y] / y_loadings_[x]
+                # theta = math.atan(gradient)
+                # x_rotate = x_scores_full[:, x] * math.cos(theta) + x_scores_full[:, y] * math.sin(theta)
+                # x_rotate_boot = x_scores_cv[:, x] * math.cos(theta) + x_scores_cv[:, y] * math.sin(theta)
 
                 self.x_rotate = x_rotate
                 group_copy = self.Y.copy()
@@ -291,13 +308,17 @@ class BaseCrossVal(ABC):
                     self.x_rotate_boot.append(x_rot)
                 self.x_rotate_boot = np.array(self.x_rotate_boot)
                 x_rotate_boot = self.x_rotate_boot
+
+                # Get Stat
+
+
                 # ROC Plot with x_rotate
                 # fpr, tpr, tpr_ci = roc_calculate(group_copy, x_rotate, bootnum=100)
                 # fpr_boot, tpr_boot, tpr_ci_boot = roc_calculate(group_copy, x_rotate_boot, bootnum=100)
 
                 # grid[x, y] = roc_plot(fpr, tpr, tpr_ci, width=width_height, height=width_height, xlabel="1-Specificity (LV{}/LV{})".format(x + 1, y + 1), ylabel="Sensitivity (LV{}/LV{})".format(x + 1, y + 1), legend=False, label_font_size=label_font, roc2=True, fpr2=fpr_boot, tpr2=tpr_boot, tpr_ci2=tpr_ci_boot)
 
-                grid[x, y] = roc_plot_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), legend=legend_roc, label_font_size=label_font, title_font_size=title_font, show_title=roc_title, plot_num=plot_num)
+                grid[x, y] = roc_cv(x_rotate, x_rotate_boot, group_copy, width=width_height, height=width_height, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), legend=legend_roc, label_font_size=label_font, title_font_size=title_font, show_title=roc_title, plot_num=plot_num, grid_line=grid_line)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())
@@ -305,7 +326,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True, grid_line=False):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -321,9 +342,9 @@ class BaseCrossVal(ABC):
 
         # Plot based on the number of parameters
         if len(self.param_dict2) == 1:
-            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci, method=method, style=style, alt=alt)
+            fig = self._plot_param1(metric=metric, scale=scale, rotate_xlabel=rotate_xlabel, model=model, legend=legend, ci=ci, method=method, style=style, alt=alt, grid_line=grid_line)
         elif len(self.param_dict2) == 2:
-            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, style=style, method=method, alt=alt)
+            fig = self._plot_param2(metric=metric, scale=scale, color_scaling=color_scaling, model=model, legend=legend, color_beta=color_beta, ci=ci, diff1_heat=diff1_heat, style=style, method=method, alt=alt, grid_line=grid_line)
         else:
             raise ValueError("plot function only works for 1 or 2 parameters, there are {}.".format(len(self.param_dict2)))
 
@@ -331,7 +352,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend=True, ci=95, method='ratio', style=0, alt=True):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend=True, ci=95, method='ratio', style=0, alt=True, grid_line=False):
         """Used for plot function if the number of parameters is 1."""
 
         # Get ci
@@ -585,6 +606,12 @@ class BaseCrossVal(ABC):
         else:
             fig2.legend.visible = False
 
+        if grid_line == False:
+            fig1.xgrid.visible = False
+            fig1.ygrid.visible = False
+            fig2.xgrid.visible = False
+            fig2.ygrid.visible = False
+
         # if legend == None or legend == False:
         #     fig2.legend.visible = False
         # else:
@@ -611,7 +638,7 @@ class BaseCrossVal(ABC):
         fig = gridplot(grid.tolist(), merge_tools=True)
         return fig
 
-    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True):
+    def _plot_param2(self, metric="r2q2", xlabel=None, orientation=0, alternative=False, scale=1, heatmap_xaxis_rotate=90, color_scaling="tanh", line=False, model="kfold", title_align="center", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True, grid_line=False):
 
         # legend always None
         legend = None
@@ -1336,6 +1363,14 @@ class BaseCrossVal(ABC):
         p4.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
         p5.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
         p6.yaxis.axis_label_text_font_size = str(10 * scale) + "pt"
+
+        if grid_line == False:
+            p4.xgrid.visible = False
+            p4.ygrid.visible = False
+            p5.xgrid.visible = False
+            p5.ygrid.visible = False
+            p6.xgrid.visible = False
+            p6.ygrid.visible = False
 
         if metric is not 'r2q2':
             if method is 'ratio':

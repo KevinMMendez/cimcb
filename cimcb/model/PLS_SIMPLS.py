@@ -9,7 +9,7 @@ from bokeh.layouts import gridplot
 from bokeh.plotting import ColumnDataSource, figure
 from .BaseModel import BaseModel
 from ..plot import permutation_test
-from ..plot import scatter, distribution, roc_calculate, roc_plot, boxplot
+from ..plot import scatter, distribution, boxplot
 
 
 class PLS_SIMPLS(BaseModel):
@@ -36,7 +36,7 @@ class PLS_SIMPLS(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.pfi_acc_", "model.pfi_r2q2_", "model.pfi_auc_"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True):
         self.model = PLSRegression()  # Should change this to an empty model

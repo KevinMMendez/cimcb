@@ -5,7 +5,7 @@ from bokeh.plotting import ColumnDataSource, figure
 from bokeh.models import HoverTool
 
 
-def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", font_size="20pt", label_font_size="13pt", width=500, height=400, color="whitesmoke", color_violin="mediumturquoise", width_boxplot=1, width_violin=1, y_range=None, group_name=None, group_name_sort=None, legend=True, label=None):
+def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", font_size="20pt", label_font_size="13pt", width=500, height=400, color="whitesmoke", color_violin="mediumturquoise", width_boxplot=1, width_violin=1, y_range=None, group_name=None, group_name_sort=None, legend=True, label=None, grid_line=False, legend_title=False):
     """Creates a boxplot using Bokeh.
 
     Required Parameters
@@ -135,8 +135,13 @@ def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", fo
 
     # Remove legend
     if legend is True:
-        fig.legend.visible = True
-        fig.legend.location = "top_left"
+        if legend_title == False:
+            fig.legend.visible = True
+            fig.legend.location = "top_left"
+        else:
+            fig.legend.visible = False
+            sort_label = np.sort(label)
+            fig.title.text = "Groups: {} (Red) & {} (Blue)".format(sort_label[0], sort_label[2])
     else:
         fig.legend.visible = False
 
@@ -150,5 +155,9 @@ def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", fo
     fig.min_border_right = 20
     fig.min_border_top = 20
     fig.min_border_bottom = 20
+
+    if grid_line == False:
+        fig.xgrid.visible = False
+        fig.ygrid.visible = False
 
     return fig

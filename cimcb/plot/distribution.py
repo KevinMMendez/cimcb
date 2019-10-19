@@ -3,7 +3,7 @@ from scipy import stats
 from bokeh.plotting import figure
 
 
-def distribution(X, group, kde=True, title="Density Plot", group_label=None, xlabel="x", ylabel="Pr(x)", font_size="20pt", label_font_size="13pt", width=500, height=400, color_hist="green", color_kde="mediumturquoise", padding=0.5, smooth=None, sigmoid=False, legend=False, legend_location="top_right", plot_num=0):
+def distribution(X, group, kde=True, title="Density Plot", group_label=None, xlabel="x", ylabel="Pr(x)", font_size="20pt", label_font_size="13pt", width=500, height=400, color_hist="green", color_kde="mediumturquoise", padding=0.5, smooth=None, sigmoid=False, legend=False, legend_location="top_right", plot_num=0, grid_line=False, legend_title=False):
     """Creates a distribution plot using Bokeh.
 
     Required Parameters
@@ -18,6 +18,7 @@ def distribution(X, group, kde=True, title="Density Plot", group_label=None, xla
         group_label = ['0', '1']
 
     # Split into groups
+    group_label = np.sort(np.unique(group_label))
     group_unique = np.sort(np.unique(group))
     x1 = X[group == group_unique[0]]
     x2 = X[group == group_unique[1]]
@@ -143,11 +144,15 @@ def distribution(X, group, kde=True, title="Density Plot", group_label=None, xla
 
     # Remove legend
     if legend is True:
-        fig.legend.visible = True
-        fig.legend.location = legend_location
+        if legend_title == False:
+            fig.legend.visible = True
+            fig.legend.location = "bottom_right"
+        else:
+            fig.legend.visible = False
+            fig.title.text = "Groups: {} (Red) & {} (Blue)".format(group_label[0], group_label[1])
     else:
         fig.legend.visible = False
-        # Y-axis should always start at 0
+
     fig.y_range.start = 0
 
     # Font-sizes
@@ -160,5 +165,9 @@ def distribution(X, group, kde=True, title="Density Plot", group_label=None, xla
     fig.min_border_right = 20
     fig.min_border_top = 20
     fig.min_border_bottom = 20
+
+    if grid_line == False:
+        fig.xgrid.visible = False
+        fig.ygrid.visible = False
 
     return fig

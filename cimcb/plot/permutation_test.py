@@ -104,7 +104,7 @@ class permutation_test():
         self._calc_original()
         self._calc_perm()
 
-    def plot(self, metric="r2q2", hide_pval=True):
+    def plot(self, metric="r2q2", hide_pval=True, grid_line=False, legend=True):
 
         # Choose metric to plot
         metric_title = np.array(["ACCURACY", "AIC", "AUC", "BIC", "F1-SCORE", "PRECISION", "R²", "SENSITIVITY", "SPECIFICITY", "SSE"])
@@ -253,6 +253,16 @@ class permutation_test():
         fig2.legend.location = "top_left"
         fig1.legend.visible = True
         fig2.legend.visible = True
+
+        if grid_line == False:
+            fig1.xgrid.visible = False
+            fig1.ygrid.visible = False
+            fig2.xgrid.visible = False
+            fig2.ygrid.visible = False
+
+        if legend == False:
+            fig1.legend.visible = False
+            fig2.legend.visible = False
 
         fig = gridplot([[fig1, fig2]])
         return fig

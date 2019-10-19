@@ -6,7 +6,7 @@ from bokeh.models import Range1d
 from ..utils import ci95_ellipse
 
 
-def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", xlabel="x", ylabel="y", width=600, height=600, legend=True, size=4, shape="circle", font_size="16pt", label_font_size="13pt", col_palette=None, hover_xy=True, gradient=False, gradient_alt=False, hline=False, vline=False, xrange=None, yrange=None, ci95=False, scatterplot=True, extraci95_x=False, extraci95_y=False, extraci95=False, scattershow=None, extraci95_x2=False, extraci95_y2=False, orthog_line=True):
+def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", xlabel="x", ylabel="y", width=600, height=600, legend=True, size=4, shape="circle", font_size="16pt", label_font_size="13pt", col_palette=None, hover_xy=True, gradient=False, gradient_alt=False, hline=False, vline=False, xrange=None, yrange=None, ci95=False, scatterplot=True, extraci95_x=False, extraci95_y=False, extraci95=False, scattershow=None, extraci95_x2=False, extraci95_y2=False, orthog_line=True, grid_line=False, mirror_range=False, legend_title=False):
     """Creates a scatterplot using Bokeh.
 
     Required Parameters
@@ -83,7 +83,7 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
     # Add to plot
     if scattershow in [2, 4]:
         if shape is "circle":
-            shape = fig.circle("x", "y", size=size, alpha=0.6, color="col", source=source)
+            shape = fig.circle("x", "y", size=size * 0.75, alpha=0.6, color="col", source=source)
         elif shape is "triangle":
             shape = fig.triangle("x", "y", size=size, alpha=0.6, color="col", source=source)
         else:
@@ -270,7 +270,7 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
                     maxv = max(np.abs(p).flatten())
                 max_val.append(maxv)
 
-        if orthog_line is True:
+        if mirror_range == False:
             max_range = max(max_val)
             new_range_min = -max_range - 0.05 * max_range
             new_range_max = max_range + 0.05 * max_range
@@ -294,6 +294,10 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
     fig.xaxis.axis_label_text_font_size = label_font_size
     fig.yaxis.axis_label_text_font_size = label_font_size
 
+    if grid_line == False:
+        fig.xgrid.visible = False
+        fig.ygrid.visible = False
+
     # Extra padding
     fig.min_border_left = 20
     fig.min_border_right = 20
@@ -302,10 +306,13 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
 
     # Remove legend
     if legend is True:
-        fig.legend.visible = True
-        fig.legend.location = "bottom_right"
+        if legend_title == False:
+            fig.legend.visible = True
+            fig.legend.location = "bottom_right"
+        else:
+            fig.legend.visible = False
+            fig.title.text = "Groups: {} (Red) & {} (Blue)".format(unique_group_label[0], unique_group_label[1])
     else:
         fig.legend.visible = False
-  
 
     return fig
