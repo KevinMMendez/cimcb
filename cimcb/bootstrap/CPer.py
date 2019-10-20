@@ -44,8 +44,8 @@ class CPer(BaseBootstrap):
         To return bootci, initalise then use method run().
     """
 
-    def __init__(self, model, bootnum=100, seed=None, n_cores=-1):
-        super().__init__(model=model, bootnum=bootnum, seed=seed, n_cores=n_cores)
+    def __init__(self, model, bootnum=100, seed=None, n_cores=-1, stratify=True):
+        super().__init__(model=model, bootnum=bootnum, seed=seed, n_cores=n_cores, stratify=stratify)
         self.__name__ = "CPer"
 
     def calc_stat(self):

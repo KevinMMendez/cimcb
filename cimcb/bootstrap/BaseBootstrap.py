@@ -25,6 +25,7 @@ from bokeh.layouts import widgetbox, gridplot, column, row, layout
 from bokeh.plotting import ColumnDataSource, figure, output_notebook, show
 from bokeh.models import Div
 from itertools import combinations
+from sklearn.utils import resample
 from ..plot import scatterCI, boxplot, distribution, roc_boot
 from ..utils import color_scale, dict_perc, nested_getattr, dict_95ci, dict_median_scores
 
@@ -33,7 +34,7 @@ class BaseBootstrap(ABC):
     """Base class for bootstrap: BC, BCA, and Perc."""
 
     @abstractmethod
-    def __init__(self, model, bootnum=100, seed=None, n_cores=-1):
+    def __init__(self, model, bootnum=100, seed=None, n_cores=-1, stratify=True):
         self.X = model.X
         self.Y = model.Y
         self.name = model.__name__
@@ -46,6 +47,7 @@ class BaseBootstrap(ABC):
         self.bootidx = []
         self.bootstat = {}
         self.bootci = {}
+        self.stratify = stratify
         self.param = model.__params__
         self.model = locate(model.__name__)
 
@@ -72,7 +74,11 @@ class BaseBootstrap(ABC):
         self.bootidx = []
         self.bootidx_oob = []
         for i in range(self.bootnum):
-            bootidx_i = np.random.choice(len(self.Y), len(self.Y))
+            #bootidx_i = np.random.choice(len(self.Y), len(self.Y))
+            if self.stratify == True:
+                bootidx_i = resample(list(range(len(self.Y))), stratify=self.Y)
+            else:
+                bootidx_i = resample(list(range(len(self.Y))))
             bootidx_oob_i = np.array(list(set(range(len(self.Y))) - set(bootidx_i)))
             self.bootidx.append(bootidx_i)
             self.bootidx_oob.append(bootidx_oob_i)
@@ -164,7 +170,7 @@ class BaseBootstrap(ABC):
 
         return [bootstatloop, bootstatloop_oob]
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data'):
 
         legend_violin = False
         legend_dist = False
@@ -263,7 +269,7 @@ class BaseBootstrap(ABC):
             jackstat = None
             jackidx = None
 
-        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0)
+        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc)
 
         fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
         output_notebook()
@@ -337,7 +343,7 @@ class BaseBootstrap(ABC):
         output_notebook()
         show(fig)
 
-    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True, orthog_line=True, grid_line=False, smooth=0):
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True, orthog_line=True, grid_line=False, smooth=0, plot_roc='data'):
         bootx = 1
         num_x_scores = len(self.stat['model.x_scores_'].T)
 
@@ -564,7 +570,7 @@ class BaseBootstrap(ABC):
                     jackstat = None
                     jackidx = None
 
-                grid[x, y] = roc_boot(self.Y, stat, bootstat, bootstat_oob, self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), width=width_height, height=width_height, label_font_size=label_font, legend=legend_roc, grid_line=grid_line, plot_num=plot_num)
+                grid[x, y] = roc_boot(self.Y, stat, bootstat, bootstat_oob, self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), width=width_height, height=width_height, label_font_size=label_font, legend=legend_roc, grid_line=grid_line, plot_num=plot_num, plot=plot_roc)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())
