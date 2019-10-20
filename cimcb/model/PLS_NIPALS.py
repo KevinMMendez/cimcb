@@ -140,7 +140,7 @@ class PLS_NIPALS(BaseModel):
         self.Y = Y  # Y vs. Y_true
         return y_pred_train
 
-    def test(self, X):
+    def test(self, X, Y=None):
         """Calculate and return Y predicted value.
 
         Parameters
