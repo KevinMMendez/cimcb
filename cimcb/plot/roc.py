@@ -55,7 +55,8 @@ def roc_boot(Y,
              label_font_size="10pt",
              legend=True,
              grid_line=False,
-             plot_num=0):
+             plot_num=0,
+             plot='data'):
 
     # Set positive
     auc_check = roc_auc_score(Y, stat)
@@ -92,8 +93,8 @@ def roc_boot(Y,
         if auc_boot > 0.5:
             pos_loop.append(pos)
         else:
-            fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
-            pos_loop.append(abs(1 - pos))
+          fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
+          pos_loop.append(abs(1 - pos))
 
         # Drop intermediates when fpr = 0
         tpr0_boot = tpr_boot[fpr_boot == 0][-1]
@@ -153,10 +154,10 @@ def roc_boot(Y,
          # Get Yscore and Y for each bootstrap oob and calculate
         Yscore_boot_oob = bootstat_oob[i]
         Ytrue_boot_oob = Y[bootidx_oob[i]]
-        fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=pos_loop[i], drop_intermediate=False)
+        fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=pos, drop_intermediate=False)
         auc_boot_oob = metrics.auc(fpr_boot_oob, tpr_boot_oob)
-        if auc_boot_oob < 0.5:
-          fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=abs(1-pos_loop[i]), drop_intermediate=False)
+        # if auc_boot_oob < 0.5:
+        #   fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=abs(1-pos_loop[i]), drop_intermediate=False)
         auc_boot_oob = metrics.auc(fpr_boot_oob, tpr_boot_oob)
         auc_bootstat_oob.append(auc_boot_oob)
 
@@ -180,6 +181,22 @@ def roc_boot(Y,
                 tpr_oob[j, i] = tpr_oob[j - 1, i]
 
     fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
+
+    # if 'data' plot original data instead of median
+    if plot == 'data':
+      tpr_list_linspace = np.concatenate([[0], tpr_list])  # Add starting 0
+      tpr_ib[:,2] = tpr_list_linspace
+    elif plot == 'median':
+      pass
+    else:
+      raise ValueError("plot must be 'data' or 'median'")
+
+    # Check upper limit / lower limit
+    for i in tpr_ib:
+      if i[0] > i[2]:
+        i[0] = i[2]
+      if i[1] < i[2]:
+        i[1] = i[2]
 
     # Calculate AUC
     auc_ib_low = metrics.auc(fpr_linspace, tpr_ib[:, 0])
