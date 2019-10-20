@@ -5,7 +5,7 @@ from copy import deepcopy, copy
 import timeit
 import time
 import multiprocessing
-from sklearn.model_selection import StratifiedKFold
+from sklearn import model_selection
 from tqdm import tqdm
 from sklearn.model_selection import ParameterGrid
 from .BaseCrossVal import BaseCrossVal
@@ -42,9 +42,12 @@ class KFold(BaseCrossVal):
     Plot: Creates a R2/Q2 plot.
     """
 
-    def __init__(self, model, X, Y, param_dict, folds=5, n_mc=1, n_boot=0, n_cores=-1, ci=95):
-        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores, ci=ci)
-        self.crossval_idx = StratifiedKFold(n_splits=folds, shuffle=True)
+    def __init__(self, model, X, Y, param_dict, folds=5, n_mc=1, n_boot=0, n_cores=-1, ci=95, stratify=True):
+        super().__init__(model=model, X=X, Y=Y, param_dict=param_dict, folds=folds, n_mc=n_mc, n_boot=n_boot, n_cores=n_cores, ci=ci, stratify=stratify)
+        if stratify == True:
+            self.crossval_idx = model_selection.StratifiedKFold(n_splits=folds, shuffle=True)
+        else:
+            self.crossval_idx = model_selection.KFold(n_splits=folds, shuffle=True)
 
     def calc_ypred(self):
         """Calculates ypred full and ypred cv."""

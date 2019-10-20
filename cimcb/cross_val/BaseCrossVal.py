@@ -23,7 +23,7 @@ class BaseCrossVal(ABC):
     """Base class for crossval: kfold."""
 
     @abstractmethod
-    def __init__(self, model, X, Y, param_dict, folds=10, n_mc=1, n_boot=0, n_cores=-1, ci=95):
+    def __init__(self, model, X, Y, param_dict, folds=10, n_mc=1, n_boot=0, n_cores=-1, ci=95, stratify=True):
         # Store basic inputs
         self.model = model
         self.X = X
@@ -49,6 +49,8 @@ class BaseCrossVal(ABC):
             if len(value) > 1:
                 self.param_dict2 = {**self.param_dict2, **{key: value}}
         self.param_list2 = list(ParameterGrid(self.param_dict2))
+
+        self.stratify = True
 
         # if n_cores = -1, set n_cores to max_cores
         max_num_cores = multiprocessing.cpu_count()
