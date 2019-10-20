@@ -65,6 +65,7 @@ class BaseBootstrap(ABC):
     def calc_stat(self):
         """Stores selected attributes (from self.bootlist) for the original model."""
         self.stat = {}
+        self.model_orig.train(self.model_orig.X, self.model_orig.Y)
         for i in self.bootlist:
             self.stat[i] = nested_getattr(self.model_orig, i)
 
@@ -170,7 +171,7 @@ class BaseBootstrap(ABC):
 
         return [bootstatloop, bootstatloop_oob]
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data'):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', test=None):
 
         legend_violin = False
         legend_dist = False
@@ -269,7 +270,7 @@ class BaseBootstrap(ABC):
             jackstat = None
             jackidx = None
 
-        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc)
+        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test)
 
         fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
         output_notebook()
