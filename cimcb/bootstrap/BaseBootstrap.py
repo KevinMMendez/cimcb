@@ -27,7 +27,7 @@ from bokeh.models import Div
 from itertools import combinations
 from sklearn.utils import resample
 from ..plot import scatterCI, boxplot, distribution, roc_boot
-from ..utils import color_scale, dict_perc, nested_getattr, dict_95ci, dict_median_scores
+from ..utils import color_scale, dict_perc, nested_getattr, dict_95ci, dict_median_scores, binary_metrics
 
 
 class BaseBootstrap(ABC):
@@ -50,7 +50,7 @@ class BaseBootstrap(ABC):
         self.stratify = stratify
         self.param = model.__params__
         self.model = locate(model.__name__)
-
+        self.test = None
         # if n_cores = -1, set n_cores to max_cores
         max_num_cores = multiprocessing.cpu_count()
         self.n_cores = n_cores
@@ -66,6 +66,7 @@ class BaseBootstrap(ABC):
         """Stores selected attributes (from self.bootlist) for the original model."""
         self.stat = {}
         self.model_orig.train(self.model_orig.X, self.model_orig.Y)
+        self.model_orig.test(self.model_orig.X, self.model_orig.Y)
         for i in self.bootlist:
             self.stat[i] = nested_getattr(self.model_orig, i)
 
@@ -153,7 +154,7 @@ class BaseBootstrap(ABC):
             model_i.train(X_res, Y_res, w1=self.w1, w2=self.w2)
         else:
             model_i.train(X_res, Y_res)
-        model_i.test(X_res)
+        model_i.test(X_res, Y_res)
         # # Get IB
         bootstatloop = {}
         for k in self.bootlist:
@@ -165,13 +166,20 @@ class BaseBootstrap(ABC):
         for k in self.bootlist:
             bootstatloop_oob[k] = []
         X_res_oob = self.X[self.bootidx_oob[i], :]
-        model_i.test(X_res_oob)
+        Y_res_oob = self.Y[self.bootidx_oob[i]]
+        model_i.test(X_res_oob, Y_res_oob)
         for j in self.bootlist:
             bootstatloop_oob[j].append(nested_getattr(model_i, j))
 
         return [bootstatloop, bootstatloop_oob]
 
     def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', test=None):
+
+        if test is not None:
+            bm = binary_metrics(test[0], test[1])
+            self.test = []
+            for key, value in bm.items():
+                self.test.append(value)
 
         legend_violin = False
         legend_dist = False
@@ -271,6 +279,16 @@ class BaseBootstrap(ABC):
             jackidx = None
 
         roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test)
+
+        stats_table = pd.DataFrame(self.bootci['metrics'],
+                                   columns=['LowCI', 'UppCI', 'Median'],
+                                   index=self.model_orig.metrics_key)
+        stats_table['Train'] = self.stat['metrics']
+
+        if self.test is not None:
+            stats_table['Test'] = self.test
+
+        self.table = stats_table
 
         fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
         output_notebook()
@@ -650,6 +668,28 @@ class BaseBootstrap(ABC):
         Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
 
         return Peaksheet
+
+    def save_results(self, name="table.xlsx"):
+
+        stats_table = pd.DataFrame(self.bootci['metrics'],
+                                   columns=['LowCI', 'UppCI', 'Median'],
+                                   index=self.model_orig.metrics_key)
+        stats_table['Train'] = self.stat['metrics']
+
+        if self.test is not None:
+            stats_table['Test'] = self.test
+
+        self.table = stats_table
+
+        table = self.table
+        check_type = name.split(".")
+        if check_type[-1] == "xlsx":
+            table.to_excel(name)
+        elif check_type[-1] == "csv":
+            table.to_csv(name)
+        else:
+            raise ValueError("name must end in .xlsx or .csv")
+        print("Done! Saved results as {}".format(name))
 
     @abstractmethod
     def calc_bootci(self):

@@ -267,9 +267,41 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         fig.xgrid.visible = False
         fig.ygrid.visible = False
 
+    fig.legend.visible =  False
     if legend == True:
-        fig.legend.location = "bottom_right"
-        fig.legend.visible = True
+      if test is None:
+          oob_text = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+
+          oob_text_add = Label(x=0.38, y=0.02,
+                           text=oob_text, render_mode='css', text_font_size= '9pt')
+
+          fig.add_layout(oob_text_add)
+
+
+          fig.quad(top=0.12, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+
+          fig.circle(0.34,0.06,color='green',size=8)
+
+      else:
+          ib_text = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+          oob_text = "Test (AUC = {:.2f})".format(auc_test)
+          ib_text_add = Label(x=0.38, y=0.10,
+                             text=ib_text, render_mode='css', text_font_size= '9pt')
+
+          fig.add_layout(ib_text_add)
+
+          oob_text_add = Label(x=0.38, y=0.02,
+                           text=oob_text, render_mode='css', text_font_size= '9pt')
+
+          fig.add_layout(oob_text_add)
+
+
+          fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+
+          fig.circle(0.34,0.14,color='green',size=8)
+          fig.circle(0.34,0.06,color='purple',size=8)
+
+
 
     return fig
 
@@ -587,27 +619,48 @@ def roc_boot(Y,
 
     if test is not None:
       if legend == True:
-        fig.legend.location = "bottom_right"
-        fig.legend.visible = True
+
+        ib_text_add = Label(x=0.38, y=0.18,
+                                   text=ib_text, render_mode='css', text_font_size= '9pt')
+
+        fig.add_layout(ib_text_add)
+
+        oob_text_add = Label(x=0.38, y=0.10,
+                         text=oob_text, render_mode='css', text_font_size= '9pt')
+
+        fig.add_layout(oob_text_add)
+
+        test_text = "Test (AUC = {:.2f})".format(auc_test)
+        test_text_add = Label(x=0.38, y=0.02,
+          text=test_text, render_mode='css', text_font_size= '9pt')
+
+        fig.add_layout(test_text_add)
+
+
+        fig.quad(top=0.28, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+
+        fig.circle(0.34,0.22,color='green',size=8)
+        fig.circle(0.34,0.14,color='orange',size=8)
+        fig.circle(0.34,0.06,color='purple',size=8)
     else:
       if legend == True:
           if plot_num in [0,1,4]:
               if width == 320:
-                ib_text_add = Label(x=0.30, y=0.15,
-                                   text=ib_text, render_mode='css', text_font_size= '6.8pt')
+                ib_text_add = Label(x=0.38, y=0.10,
+                                   text=ib_text, render_mode='css', text_font_size= '9pt')
 
                 fig.add_layout(ib_text_add)
 
-                oob_text_add = Label(x=0.30, y=0.05,
-                                 text=oob_text, render_mode='css', text_font_size= '6.8pt')
+                oob_text_add = Label(x=0.38, y=0.02,
+                                 text=oob_text, render_mode='css', text_font_size= '9pt')
 
                 fig.add_layout(oob_text_add)
 
 
-                fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
 
-                fig.circle(0.25,0.18,color='green',size=8)
-                fig.circle(0.25,0.08,color='orange',size=8)
+                fig.circle(0.34,0.14,color='green',size=8)
+                fig.circle(0.34,0.06,color='orange',size=8)
               elif width == 475:
                   ib_text_add = Label(x=0.52, y=0.15,
                                    text=ib_text, render_mode='css', text_font_size= '10pt')

@@ -10,6 +10,7 @@ from bokeh.plotting import ColumnDataSource, figure
 from .BaseModel import BaseModel
 from ..plot import permutation_test
 from ..plot import scatter, distribution, boxplot
+from ..utils import binary_metrics
 
 
 class PLS_SIMPLS(BaseModel):
@@ -36,7 +37,7 @@ class PLS_SIMPLS(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "metrics"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True):
         self.model = PLSRegression()  # Should change this to an empty model
@@ -105,13 +106,22 @@ class PLS_SIMPLS(BaseModel):
             self.model.pfi_r2q2_ = pfi_r2q2
             self.model.pfi_auc_ = pfi_auc
 
+        self.metrics_key = []
+        self.metrics = []
+        bm = binary_metrics(Y, y_pred_train)
+        for key, value in bm.items():
+            self.metrics.append(value)
+            self.metrics_key.append(key)
+
+        self.metrics = np.array(self.metrics)
+
         # Storing X, Y, and Y_pred
         self.X = X
         self.Y = Y
         self.Y_pred = y_pred_train
         return y_pred_train
 
-    def test(self, X):
+    def test(self, X, Y=None):
         """Calculate and return Y predicted value.
 
         Parameters
@@ -134,6 +144,15 @@ class PLS_SIMPLS(BaseModel):
         newX = np.insert(X, 0, np.ones(len(X)), axis=1)
         y_pred_test = np.matmul(newX, self.model.beta_)
         self.Y_pred = y_pred_test
+
+        if Y is not None:
+            self.metrics = []
+            bm = binary_metrics(Y, y_pred_test)
+            for key, value in bm.items():
+                self.metrics.append(value)
+
+        self.metrics = np.array(self.metrics)
+
         return y_pred_test
 
     @staticmethod

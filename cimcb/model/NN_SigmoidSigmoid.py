@@ -199,7 +199,7 @@ def pctvar_calc(model, X, Y):
         pctvar.append(r2_i)
     else:
         for i in range(len(w2)):
-            x2 = logistic.cdf(np.matmul(x1, w1[:,i]) + b1[i])
+            x2 = logistic.cdf(np.matmul(x1, w1[:, i]) + b1[i])
             x2 = np.reshape(x2, (-1, 1))
             y = logistic.cdf(np.matmul(x2, w2[i]) + b2)
             r2_i = explained_variance_score(Y, y) * 100

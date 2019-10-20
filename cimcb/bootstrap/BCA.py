@@ -80,7 +80,7 @@ class BCA(BaseBootstrap):
             model_i.train(X_res, Y_res, w1=self.w1, w2=self.w2)
         else:
             model_i.train(X_res, Y_res)
-        model_i.test(X_res)
+        model_i.test(X_res, Y_res)
         # # Get IB
         jackstatloop = {}
         for k in self.bootlist:
