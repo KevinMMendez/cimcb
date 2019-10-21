@@ -285,7 +285,7 @@ class BaseBootstrap(ABC):
         roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table)
 
         stats_table = pd.DataFrame(self.bootci['metrics'],
-                                   columns=['IBLowCI', 'IBUppCI', 'IBMedian'],
+                                   columns=['IBLowCI', 'IBUppCI', 'IBMidCI'],
                                    index=self.model_orig.metrics_key)
         stats_table['OOBLowCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 2.5, axis=0)
         stats_table['OOBUppCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 97.5, axis=0)
@@ -309,13 +309,20 @@ class BaseBootstrap(ABC):
             fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
         else:
             table = self.table
-
-            tabledata = dict(
-                evaluate=[["Train IB"]],
-                manw_pval=[["{}".format(table['Train'][2])]],
-                auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
-                R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
-            )
+            if plot_roc == 'data':
+                tabledata = dict(
+                    evaluate=[["Train IB"]],
+                    manw_pval=[["{}".format(table['Train'][2])]],
+                    auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
+                    R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
+                )
+            else:
+                tabledata = dict(
+                    evaluate=[["Train IB"]],
+                    manw_pval=[["{}".format(table['IBMidCI'][2])]],
+                    auc=[["{} ({}, {})".format(table['IBMidCI'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
+                    R2=[["{} ({}, {})".format(table['IBMidCI'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
+                )
 
             # Append test data
             tabledata["evaluate"].append(["Train OOB"])
