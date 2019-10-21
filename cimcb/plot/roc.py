@@ -35,10 +35,11 @@ from scipy import interp
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.utils import resample
-# import cimcb.model
+from ..utils import binary_evaluation
 
 
-def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_font_size="10pt", xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, method='BCA', plot='data'):
+def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_font_size="10pt", xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, method='BCA', plot='data', legend_basic=False):
+
     # Set positive
     auc_check = roc_auc_score(Y, stat)
     if auc_check > 0.5:
@@ -62,7 +63,15 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
     idx = [np.abs(i - fpr_stat).argmin() for i in fpr_linspace]
     tpr_list = np.array(tpr_stat[idx])
 
+    binary_stats_train_dict = binary_evaluation(Y, stat)
+    binary_stats_train = []
+    for key, value in binary_stats_train_dict.items():
+      binary_stats_train.append(value)
+    binary_stats_train = np.array(binary_stats_train)
+
+    binary_stats_train_boot = []
     tpr_bootstat = []
+
     if bootnum > 1:
       for i in range(bootnum):
         bootidx = resample(list(range(len(Y))), stratify=Y)  # Default stratified
@@ -74,6 +83,11 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         if auc_boot < 0.5:
           fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
 
+        bstat_loop = binary_evaluation(Ytrue_boot, Yscore_boot)
+        bstat_list = []
+        for key, value in bstat_loop.items():
+            bstat_list.append(value)
+        binary_stats_train_boot.append(bstat_list)
         # Drop intermediates when fpr = 0
         tpr0_boot = tpr_boot[fpr_boot == 0][-1]
         tpr_boot = np.concatenate([[tpr0_boot], tpr_boot[fpr_boot > 0]])
@@ -82,9 +96,11 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         # Vertical averaging
         idx = [np.abs(i - fpr_boot).argmin() for i in fpr_linspace]
         tpr_bootstat.append(np.array(tpr_boot[idx]))
+    binary_stats_train_boot = np.array(binary_stats_train_boot)
 
     if bootnum > 1:
       if method == 'BCA':
+        binary_stats_jack_boot = []
         jackidx = []
         base = np.arange(0, len(Y))
         for i in base:
@@ -101,6 +117,12 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
           if auc_boot < 0.5:
             fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=abs(1 - pos), drop_intermediate=False)
 
+          jstat_loop = binary_evaluation(Ytrue_jack, Yscore_jack)
+          jstat_list = []
+          for key, value in jstat_loop.items():
+              jstat_list.append(value)
+          binary_stats_jack_boot.append(jstat_list)
+
           # Drop intermediates when fpr = 0
           tpr0_jack = tpr_boot[fpr_boot == 0][-1]
           tpr_jack = np.concatenate([[tpr0_jack], tpr_jack[fpr_jack > 0]])
@@ -109,20 +131,28 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
           # Vertical averaging
           idx = [np.abs(i - fpr_jack).argmin() for i in fpr_linspace]
           tpr_jackstat.append(np.array(tpr_jack[idx]))
+        binary_stats_jack_boot = np.array(binary_stats_jack_boot)
 
     if bootnum > 1:
       if method == 'BCA':
           tpr_ib = bca_method(tpr_bootstat, tpr_list, tpr_jackstat)
           tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+          stat_ib = bca_method(binary_stats_train_boot, binary_stats_train, binary_stats_jack_boot)
       elif method == 'Per':
           tpr_ib = per_method(tpr_bootstat, tpr_list)
           tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+          stat_ib = per_method(binary_stats_train_boot, binary_stats_train)
+          stat_ib = list(stat_ib)
       elif method == 'CPer':
           tpr_ib = cper_method(tpr_bootstat, tpr_list)
           tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+          stat_ib = cper_method(binary_stats_train_boot, binary_stats_train)
+          stat_ib = list(stat_ib)
       else:
         raise ValueError("bootmethod has to be 'BCA', 'Perc', or 'CPer'.")
 
+      #stat_ib = np.array(stat_ib).T
+      #print(stat_ib)
       # ROC up
       for i in range(len(tpr_ib.T)):
           for j in range(1, len(tpr_ib)):
@@ -132,6 +162,8 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       # Get tpr mid
       if method != 'Per':
           tpr_ib[:, 2] = (tpr_ib[:, 0] + tpr_ib[:, 1]) / 2
+          for i in range(len(stat_ib)):
+            stat_ib[i][2] = binary_stats_train[i]
     else:
       tpr_ib = []
       tpr_ib.append(tpr_list)
@@ -140,7 +172,14 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       tpr_ib = np.array(tpr_ib)
       tpr_ib = tpr_ib.T
       tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
-
+      binary_stats_train_dict = binary_evaluation(Y, stat)
+      binary_stats_train = []
+      for key, value in binary_stats_train_dict.items():
+        binary_stats_train.append(value)
+      stat_ib = []
+      stat_ib.append(binary_stats_train)
+      stat_ib.append(binary_stats_train)
+      stat_ib.append(binary_stats_train)
 
     # Test if available
     if test is not None:
@@ -149,23 +188,28 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       fpr_test, tpr_test, _ = metrics.roc_curve(test_y, test_ypred, pos_label=pos, drop_intermediate=False)
       auc_test = metrics.auc(fpr_test, tpr_test)
 
+      binary_stats_test_dict = binary_evaluation(test_y, test_ypred)
+      binary_stats_test = []
+      for key, value in binary_stats_test_dict.items():
+        binary_stats_test.append(value)
+      stat_ib.append(binary_stats_test)
+
       # Drop intermediates when fpr = 0
-      tpr0_test= tpr_test[fpr_test == 0][-1]
+      tpr0_test = tpr_test[fpr_test == 0][-1]
       tpr_test = np.concatenate([[tpr0_test], tpr_test[fpr_test > 0]])
       fpr_test = np.concatenate([[0], fpr_test[fpr_test > 0]])
 
       # Vertical averaging
       idx_test = [np.abs(i - fpr_test).argmin() for i in fpr_linspace]
       tpr_test = tpr_test[idx_test]
-      tpr_test = np.insert(tpr_test, 0, 0) # Add starting 0
-
+      tpr_test = np.insert(tpr_test, 0, 0)  # Add starting 0
 
     fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
 
     # if 'data' plot original data instead of median
     if plot == 'data':
       tpr_list_linspace = np.concatenate([[0], tpr_list])  # Add starting 0
-      tpr_ib[:,2] = tpr_list_linspace
+      tpr_ib[:, 2] = tpr_list_linspace
     elif plot == 'median':
       pass
     else:
@@ -184,7 +228,6 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
     auc_ib_mid = metrics.auc(fpr_linspace, tpr_ib[:, 2])
     auc_ib = np.array([auc_ib_low, auc_ib_upp, auc_ib_mid])
 
-
     # Plot
     spec = 1 - fpr_linspace
     ci_ib = (tpr_ib[:, 1] - tpr_ib[:, 0]) / 2
@@ -197,7 +240,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
                  y_axis_label=ylabel,
                  x_range=(-0.06, 1.06),
                  y_range=(-0.06, 1.06))
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=4)  # Equal Distribution Line
+    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=3)  # Equal Distribution Line
 
     # Plot IB
     data_ib = {"x": fpr_linspace,
@@ -210,12 +253,16 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
 
     # Line IB
     if bootnum > 1:
+        if legend_basic == True:
+          legend_ib = "Train"
+        else:
+          legend_ib = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0]) / 2)
         figline_ib = fig.line("x",
                               "y",
                               color="green",
-                              line_width=4,
-                              alpha=0.6,
-                              legend="Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0]) / 2),
+                              line_width=3,
+                              alpha=0.8,
+                              legend=legend_ib,
                               source=source_ib)
         fig.add_tools(HoverTool(renderers=[figline_ib],
                                 tooltips=[("Specificity", "@spec{1.111}"),
@@ -232,19 +279,29 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
                           source=source_ib)
         fig.add_layout(figband_ib)
     else:
+        if legend_basic == True:
+            legend_ib = "Train"
+        else:
+            legend_ib = "Train (AUC = {:.2f})".format(auc_ib[2])
+
         figline_ib = fig.line("x",
-                                "y",
-                                color="green",
-                                line_width=4,
-                                alpha=0.6,
-                                legend="Train (AUC = {:.2f})".format(auc_ib[2]),
-                                source=source_ib)
+                              "y",
+                              color="green",
+                              line_width=3,
+                              alpha=0.8,
+                              legend=legend_ib,
+                              source=source_ib)
         fig.add_tools(HoverTool(renderers=[figline_ib],
                                 tooltips=[("Specificity", "@spec{1.111}"),
-                                          ("Sensitivity", "@y{1.111}"), ]))
+                                          ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ]))
 
     # Line Test
     if test is not None:
+      if legend_basic == True:
+        legend_oob = "Test"
+      else:
+        legend_oob = "Test (AUC = {:.2f})".format(auc_test)
+
       # Plot IB
       data_test = {"x": fpr_linspace,
                  "y": tpr_test,
@@ -255,10 +312,11 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       figline_test = fig.line("x",
                             "y",
                             color="purple",
-                            line_width=4,
-                            alpha=0.6,
-                            legend="Test (AUC = {:.2f})".format(auc_test),
-                            source=source_test)
+                            line_width=3,
+                            alpha=0.8,
+                            legend=legend_oob,
+                            source=source_test,
+                            line_dash="dashed")
       fig.add_tools(HoverTool(renderers=[figline_test],
                               tooltips=[("Specificity", "@spec{1.111}"),
                                           ("Sensitivity", "@y{1.111}"), ]))
@@ -268,42 +326,48 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         fig.ygrid.visible = False
 
     fig.legend.visible =  False
+
     if legend == True:
-      if test is None:
-          oob_text = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
-
-          oob_text_add = Label(x=0.38, y=0.02,
-                           text=oob_text, render_mode='css', text_font_size= '9pt')
-
-          fig.add_layout(oob_text_add)
-
-
-          fig.quad(top=0.12, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
-
-          fig.circle(0.34,0.06,color='green',size=8)
-
+      if legend_basic == True:
+        fig.legend.visible =  True
+        fig.legend.location = "bottom_right"
       else:
-          ib_text = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
-          oob_text = "Test (AUC = {:.2f})".format(auc_test)
-          ib_text_add = Label(x=0.38, y=0.10,
-                             text=ib_text, render_mode='css', text_font_size= '9pt')
+        if test is None:
+            oob_text = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-          fig.add_layout(ib_text_add)
+            oob_text_add = Label(x=0.38, y=0.02,
+                             text=oob_text, render_mode='css', text_font_size= '9pt')
 
-          oob_text_add = Label(x=0.38, y=0.02,
-                           text=oob_text, render_mode='css', text_font_size= '9pt')
-
-          fig.add_layout(oob_text_add)
+            fig.add_layout(oob_text_add)
 
 
-          fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+            fig.quad(top=0.12, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
 
-          fig.circle(0.34,0.14,color='green',size=8)
-          fig.circle(0.34,0.06,color='purple',size=8)
+            fig.circle(0.34,0.06,color='green',size=8)
+
+        else:
+            ib_text = "Train (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+            oob_text = "Test (AUC = {:.2f})".format(auc_test)
+            ib_text_add = Label(x=0.38, y=0.10,
+                               text=ib_text, render_mode='canvas', text_font_size= '9pt')
+
+            fig.add_layout(ib_text_add)
+
+            oob_text_add = Label(x=0.38, y=0.02,
+                             text=oob_text, render_mode='canvas', text_font_size= '9pt')
+
+            fig.add_layout(oob_text_add)
 
 
+            fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
 
-    return fig
+            fig.circle(0.34,0.14,color='green',size=8)
+            fig.circle(0.34,0.06,color='purple',size=8)
+
+    if legend_basic == True:
+      return fig, stat_ib
+    else:
+      return fig
 
 def roc_boot(Y,
              stat,
@@ -324,7 +388,8 @@ def roc_boot(Y,
              grid_line=False,
              plot_num=0,
              plot='data',
-             test=None):
+             test=None,
+             legend_basic=False):
 
     # Set positive
     auc_check = roc_auc_score(Y, stat)
@@ -516,7 +581,7 @@ def roc_boot(Y,
                  y_axis_label=ylabel,
                  x_range=(-0.06, 1.06),
                  y_range=(-0.06, 1.06))
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=4)  # Equal Distribution Line
+    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=3)  # Equal Distribution Line
 
     # Plot IB
     data_ib = {"x": fpr_linspace,
@@ -529,12 +594,18 @@ def roc_boot(Y,
 
     # Line IB
     if plot_num in [0, 1, 2, 4]:
+
+        if legend_basic == True:
+          legend_text = "Train IB"
+        else:
+          legend_text = "IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0]) / 2)
+
         figline_ib = fig.line("x",
                               "y",
                               color="green",
-                              line_width=4,
-                              alpha=0.6,
-                              legend="IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0]) / 2),
+                              line_width=3,
+                              alpha=0.8,
+                              legend=legend_text,
                               source=source_ib)
         fig.add_tools(HoverTool(renderers=[figline_ib],
                                 tooltips=[("Specificity", "@spec{1.111}"),
@@ -562,12 +633,18 @@ def roc_boot(Y,
 
     # Line OOB
     if plot_num in [0, 1, 3, 4]:
+
+        if legend_basic == True:
+          legend_text = "Train OOB"
+        else:
+          legend_text = "OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob[2], (auc_oob[1] - auc_oob[0]) / 2)
+
         figline = fig.line("x",
                            "y",
                            color="orange",
-                           line_width=4,
-                           alpha=0.6,
-                           legend="OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob[2], (auc_oob[1] - auc_oob[0]) / 2),
+                           line_width=3,
+                           alpha=0.8,
+                           legend=legend_text,
                            source=source_oob)
         fig.add_tools(HoverTool(renderers=[figline],
                                 tooltips=[("Specificity", "@spec{1.111}"),
@@ -587,6 +664,11 @@ def roc_boot(Y,
 
     # Line Test
     if test is not None:
+
+      if legend_basic == True:
+        legend_text = "Test"
+      else:
+        legend_text = "Test (AUC = {:.2f})".format(auc_test)
       # Plot IB
       data_test = {"x": fpr_linspace,
                  "y": tpr_test,
@@ -597,9 +679,10 @@ def roc_boot(Y,
       figline_test = fig.line("x",
                             "y",
                             color="purple",
-                            line_width=4,
-                            alpha=0.6,
-                            legend="Test (AUC = {:.2f})".format(auc_test),
+                            line_width=3,
+                            alpha=0.8,
+                            legend=legend_text,
+                            line_dash="dashed",
                             source=source_test)
       fig.add_tools(HoverTool(renderers=[figline_test],
                               tooltips=[("Specificity", "@spec{1.111}"),
@@ -617,423 +700,427 @@ def roc_boot(Y,
 
     fig.legend.visible =  False
 
-    if test is not None:
-      if legend == True:
-
-        ib_text_add = Label(x=0.38, y=0.18,
-                                   text=ib_text, render_mode='css', text_font_size= '9pt')
-
-        fig.add_layout(ib_text_add)
-
-        oob_text_add = Label(x=0.38, y=0.10,
-                         text=oob_text, render_mode='css', text_font_size= '9pt')
-
-        fig.add_layout(oob_text_add)
-
-        test_text = "Test (AUC = {:.2f})".format(auc_test)
-        test_text_add = Label(x=0.38, y=0.02,
-          text=test_text, render_mode='css', text_font_size= '9pt')
-
-        fig.add_layout(test_text_add)
-
-
-        fig.quad(top=0.28, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
-
-        fig.circle(0.34,0.22,color='green',size=8)
-        fig.circle(0.34,0.14,color='orange',size=8)
-        fig.circle(0.34,0.06,color='purple',size=8)
+    if legend_basic == True:
+      fig.legend.location = "bottom_right"
+      fig.legend.visible = True
     else:
-      if legend == True:
-          if plot_num in [0,1,4]:
-              if width == 320:
-                ib_text_add = Label(x=0.38, y=0.10,
-                                   text=ib_text, render_mode='css', text_font_size= '9pt')
+      if test is not None:
+        if legend == True:
 
-                fig.add_layout(ib_text_add)
+          ib_text_add = Label(x=0.38, y=0.18,
+                                     text=ib_text, render_mode='canvas', text_font_size= '9pt')
 
-                oob_text_add = Label(x=0.38, y=0.02,
-                                 text=oob_text, render_mode='css', text_font_size= '9pt')
+          fig.add_layout(ib_text_add)
 
-                fig.add_layout(oob_text_add)
+          oob_text_add = Label(x=0.38, y=0.10,
+                           text=oob_text, render_mode='canvas', text_font_size= '9pt')
+
+          fig.add_layout(oob_text_add)
+
+          test_text = "Test (AUC = {:.2f})".format(auc_test)
+          test_text_add = Label(x=0.38, y=0.02,
+            text=test_text, render_mode='canvas', text_font_size= '9pt')
+
+          fig.add_layout(test_text_add)
 
 
-                fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+          fig.quad(top=0.28, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
 
-                fig.circle(0.34,0.14,color='green',size=8)
-                fig.circle(0.34,0.06,color='orange',size=8)
-              elif width == 475:
-                  ib_text_add = Label(x=0.52, y=0.15,
-                                   text=ib_text, render_mode='css', text_font_size= '10pt')
+          fig.circle(0.34,0.22,color='green',size=8)
+          fig.circle(0.34,0.14,color='orange',size=8)
+          fig.circle(0.34,0.06,color='purple',size=8)
+      else:
+        if legend == True:
+            if plot_num in [0,1,4]:
+                if width == 320:
+                  ib_text_add = Label(x=0.38, y=0.10,
+                                     text=ib_text, render_mode='canvas', text_font_size= '9pt')
 
                   fig.add_layout(ib_text_add)
 
-                  oob_text_add = Label(x=0.52, y=0.05,
-                                   text=oob_text, render_mode='css', text_font_size= '10pt')
+                  oob_text_add = Label(x=0.38, y=0.02,
+                                   text=oob_text, render_mode='canvas', text_font_size= '9pt')
 
                   fig.add_layout(oob_text_add)
 
 
-                  fig.quad(top=0.25, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                  fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.47,0.17,color='green',size=8)
-                  fig.circle(0.47,0.07,color='orange',size=8)
-              elif width == 316:
-                  ib_text_add = Label(x=0.30, y=0.15,
-                                   text=ib_text, render_mode='css', text_font_size= '6.8pt')
+                  fig.circle(0.34,0.14,color='green',size=8)
+                  fig.circle(0.34,0.06,color='orange',size=8)
+                elif width == 475:
+                    ib_text_add = Label(x=0.52, y=0.15,
+                                     text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
-                  fig.add_layout(ib_text_add)
+                    fig.add_layout(ib_text_add)
 
-                  oob_text_add = Label(x=0.30, y=0.05,
-                                   text=oob_text, render_mode='css', text_font_size= '6.8pt')
+                    oob_text_add = Label(x=0.52, y=0.05,
+                                     text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
-                  fig.add_layout(oob_text_add)
+                    fig.add_layout(oob_text_add)
 
 
-                  fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.25, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
 
-                  fig.circle(0.25,0.18,color='green',size=8)
-                  fig.circle(0.25,0.08,color='orange',size=8)
-              elif width == 237:
-                  ib_text_1 = "IB (AUC = {:.2f}".format(auc_ib[2])
-                  ib_text_2 = "+/- {:.2f})".format((auc_ib[1] - auc_ib[0])/2)
+                    fig.circle(0.47,0.17,color='green',size=8)
+                    fig.circle(0.47,0.07,color='orange',size=8)
+                elif width == 316:
+                    ib_text_add = Label(x=0.30, y=0.15,
+                                     text=ib_text, render_mode='canvas', text_font_size= '6.8pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(ib_text_add)
 
+                    oob_text_add = Label(x=0.30, y=0.05,
+                                     text=oob_text, render_mode='canvas', text_font_size= '6.8pt')
 
-                  ib_text_add_1 = Label(x=0.38, y=0.28,
-                                   text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                    fig.add_layout(oob_text_add)
 
-                  fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_2 = Label(x=0.38, y=0.19,
-                                   text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                    fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.circle(0.25,0.18,color='green',size=8)
+                    fig.circle(0.25,0.08,color='orange',size=8)
+                elif width == 237:
+                    ib_text_1 = "IB (AUC = {:.2f}".format(auc_ib[2])
+                    ib_text_2 = "+/- {:.2f})".format((auc_ib[1] - auc_ib[0])/2)
 
-                  oob_text_add_1 = Label(x=0.38, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_2 = Label(x=0.38, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                    ib_text_add_1 = Label(x=0.38, y=0.28,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.add_layout(ib_text_add_1)
 
+                    ib_text_add_2 = Label(x=0.38, y=0.19,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.quad(top=0.4, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                    fig.add_layout(ib_text_add_2)
 
-                  fig.circle(0.27,0.30,color='green',size=8)
-                  fig.circle(0.27,0.10,color='orange',size=8)
-              elif width == 190:
-                  ib_text_1 = "IB (AUC ="
-                  ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+                    oob_text_add_1 = Label(x=0.38, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(oob_text_add_1)
 
+                    oob_text_add_2 = Label(x=0.38, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  ib_text_add_1 = Label(x=0.28, y=0.32,
-                                   text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                    fig.add_layout(oob_text_add_2)
 
-                  fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_2 = Label(x=0.28, y=0.23,
-                                   text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                    fig.quad(top=0.4, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.circle(0.27,0.30,color='green',size=8)
+                    fig.circle(0.27,0.10,color='orange',size=8)
+                elif width == 190:
+                    ib_text_1 = "IB (AUC ="
+                    ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-                  oob_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                    ib_text_add_1 = Label(x=0.28, y=0.32,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.add_layout(ib_text_add_1)
 
+                    ib_text_add_2 = Label(x=0.28, y=0.23,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.add_layout(ib_text_add_2)
 
-                  fig.circle(0.20,0.30,color='green',size=8)
-                  fig.circle(0.20,0.10,color='orange',size=8)
-              elif width == 158:
-                  ib_text_1 = "IB (AUC ="
-                  ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+                    oob_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(oob_text_add_1)
 
+                    oob_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  ib_text_add_1 = Label(x=0.28, y=0.32,
-                                   text=ib_text_1, render_mode='css', text_font_size= '6pt')
+                    fig.add_layout(oob_text_add_2)
 
-                  fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_2 = Label(x=0.28, y=0.23,
-                                   text=ib_text_2, render_mode='css', text_font_size= '6pt')
+                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.circle(0.20,0.30,color='green',size=8)
+                    fig.circle(0.20,0.10,color='orange',size=8)
+                elif width == 158:
+                    ib_text_1 = "IB (AUC ="
+                    ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-                  oob_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '6pt')
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '6pt')
+                    ib_text_add_1 = Label(x=0.28, y=0.32,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '6pt')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.add_layout(ib_text_add_1)
 
+                    ib_text_add_2 = Label(x=0.28, y=0.23,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '6pt')
 
-                  fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.add_layout(ib_text_add_2)
 
-                  fig.circle(0.20,0.30,color='green',size=8)
-                  fig.circle(0.20,0.10,color='orange',size=8)
-              elif width == 135:
-                  ib_text_1 = "IB (AUC ="
-                  ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+                    oob_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '6pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(oob_text_add_1)
 
+                    oob_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '6pt')
 
-                  ib_text_add_1 = Label(x=0.28, y=0.32,
-                                   text=ib_text_1, render_mode='css', text_font_size= '5pt')
+                    fig.add_layout(oob_text_add_2)
 
-                  fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_2 = Label(x=0.28, y=0.23,
-                                   text=ib_text_2, render_mode='css', text_font_size= '5pt')
+                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.circle(0.20,0.30,color='green',size=8)
+                    fig.circle(0.20,0.10,color='orange',size=8)
+                elif width == 135:
+                    ib_text_1 = "IB (AUC ="
+                    ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-                  oob_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '5pt')
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '5pt')
+                    ib_text_add_1 = Label(x=0.28, y=0.32,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '5pt')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.add_layout(ib_text_add_1)
 
+                    ib_text_add_2 = Label(x=0.28, y=0.23,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '5pt')
 
-                  fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.add_layout(ib_text_add_2)
 
-                  fig.circle(0.20,0.30,color='green',size=8)
-                  fig.circle(0.20,0.10,color='orange',size=8)
-              else:
-                  fig.legend.location = "bottom_right"
-                  fig.legend.visible = True
-          elif plot_num == 2:
-              if width == 475:
-                  ib_text_add = Label(x=0.52, y=0.03,
-                                   text=ib_text, render_mode='css', text_font_size= '10pt')
+                    oob_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '5pt')
 
-                  fig.add_layout(ib_text_add)
+                    fig.add_layout(oob_text_add_1)
 
-                  fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                    oob_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '5pt')
 
-                  fig.circle(0.47,0.05,color='green',size=8)
-              elif width == 316:
-                  ib_text_add = Label(x=0.30, y=0.02,
-                                   text=ib_text, render_mode='css', text_font_size= '10pt')
+                    fig.add_layout(oob_text_add_2)
 
-                  fig.add_layout(ib_text_add)
 
-                  fig.quad(top=0.10, bottom=0, left=0.20, right=1, color='white', alpha=0.4,line_color='black')
+                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.25,0.05,color='green',size=8)
-              elif width == 237:
-                  ib_text_1 = "IB (AUC = {:.2f}".format(auc_ib[2])
-                  ib_text_2 = "+/- {:.2f})".format((auc_ib[1] - auc_ib[0])/2)
+                    fig.circle(0.20,0.30,color='green',size=8)
+                    fig.circle(0.20,0.10,color='orange',size=8)
+                else:
+                    fig.legend.location = "bottom_right"
+                    fig.legend.visible = True
+            elif plot_num == 2:
+                if width == 475:
+                    ib_text_add = Label(x=0.52, y=0.03,
+                                     text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
+                    fig.add_layout(ib_text_add)
 
-                  ib_text_add_1 = Label(x=0.38, y=0.09,
-                                   text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                    fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
 
-                  fig.add_layout(ib_text_add_1)
+                    fig.circle(0.47,0.05,color='green',size=8)
+                elif width == 316:
+                    ib_text_add = Label(x=0.30, y=0.02,
+                                     text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
-                  ib_text_add_2 = Label(x=0.38, y=0.00,
-                                   text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                    fig.add_layout(ib_text_add)
 
+                    fig.quad(top=0.10, bottom=0, left=0.20, right=1, color='white', alpha=0.4,line_color='black')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.circle(0.25,0.05,color='green',size=8)
+                elif width == 237:
+                    ib_text_1 = "IB (AUC = {:.2f}".format(auc_ib[2])
+                    ib_text_2 = "+/- {:.2f})".format((auc_ib[1] - auc_ib[0])/2)
 
-                  fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.27,0.10,color='green',size=8)
-              elif width == 190:
-                  ib_text_1 = "IB (AUC ="
-                  ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+                    ib_text_add_1 = Label(x=0.38, y=0.09,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
+                    fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                    ib_text_add_2 = Label(x=0.38, y=0.00,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                    fig.add_layout(ib_text_add_2)
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
 
+                    fig.circle(0.27,0.10,color='green',size=8)
+                elif width == 190:
+                    ib_text_1 = "IB (AUC ="
+                    ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-                  fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.20,0.10,color='green',size=8)
-              elif width == 158:
-                  ib_text_1 = "IB (AUC ="
-                  ib_text_2 = "{:.2f}+/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+                    ib_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
+                    fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=ib_text_1, render_mode='css', text_font_size= '6pt')
+                    ib_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.add_layout(ib_text_add_1)
+                    fig.add_layout(ib_text_add_2)
 
-                  ib_text_add_2 = Label(x=0.28, y=0,
-                                   text=ib_text_2, render_mode='css', text_font_size= '6pt')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
+                    fig.circle(0.20,0.10,color='green',size=8)
+                elif width == 158:
+                    ib_text_1 = "IB (AUC ="
+                    ib_text_2 = "{:.2f}+/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-                  fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.20,0.10,color='green',size=8)
-              elif width == 135:
-                  ib_text_1 = "IB (AUC ="
-                  ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
+                    ib_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '6pt')
 
+                    fig.add_layout(ib_text_add_1)
 
-                  ib_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=ib_text_1, render_mode='css', text_font_size= '5pt')
+                    ib_text_add_2 = Label(x=0.28, y=0,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '6pt')
 
-                  fig.add_layout(ib_text_add_1)
+                    fig.add_layout(ib_text_add_2)
 
-                  ib_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=ib_text_2, render_mode='css', text_font_size= '5pt')
 
-                  fig.add_layout(ib_text_add_2)
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
+                    fig.circle(0.20,0.10,color='green',size=8)
+                elif width == 135:
+                    ib_text_1 = "IB (AUC ="
+                    ib_text_2 = "{:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
 
-                  fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.20,0.10,color='green',size=8)
-              else:
-                  fig.legend.location = "bottom_right"
-                  fig.legend.visible = True
+                    ib_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=ib_text_1, render_mode='canvas', text_font_size= '5pt')
 
+                    fig.add_layout(ib_text_add_1)
 
-          elif plot_num == 3:
-              if width == 475:
-                  oob_text_add = Label(x=0.52, y=0.03,
-                                   text=oob_text, render_mode='css', text_font_size= '10pt')
+                    ib_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=ib_text_2, render_mode='canvas', text_font_size= '5pt')
 
-                  fig.add_layout(oob_text_add)
+                    fig.add_layout(ib_text_add_2)
 
 
-                  fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.47,0.05,color='orange',size=8)
-                  # fig.circle(0.47,0.07,color='orange',size=8)
-              elif width == 316:
+                    fig.circle(0.20,0.10,color='green',size=8)
+                else:
+                    fig.legend.location = "bottom_right"
+                    fig.legend.visible = True
 
-                  oob_text_add = Label(x=0.22, y=0.02,
-                                   text=oob_text, render_mode='css', text_font_size= '10pt')
 
-                  fig.add_layout(oob_text_add)
+            elif plot_num == 3:
+                if width == 475:
+                    oob_text_add = Label(x=0.52, y=0.03,
+                                     text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
+                    fig.add_layout(oob_text_add)
 
-                  fig.quad(top=0.10, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.17,0.05,color='orange',size=8)
-              elif width == 237:
+                    fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f}+/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.circle(0.47,0.05,color='orange',size=8)
+                    # fig.circle(0.47,0.07,color='orange',size=8)
+                elif width == 316:
 
+                    oob_text_add = Label(x=0.22, y=0.02,
+                                     text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
-                  oob_text_add_1 = Label(x=0.38, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                    fig.add_layout(oob_text_add)
 
-                  fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_2 = Label(x=0.38, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                    fig.quad(top=0.10, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.circle(0.17,0.05,color='orange',size=8)
+                elif width == 237:
 
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f}+/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.27,0.10,color='orange',size=8)
-              elif width == 190:
+                    oob_text_add_1 = Label(x=0.38, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                    oob_text_add_2 = Label(x=0.38, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
-                  fig.add_layout(oob_text_add_1)
+                    fig.add_layout(oob_text_add_2)
 
-                  oob_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
 
+                    fig.circle(0.27,0.10,color='orange',size=8)
+                elif width == 190:
 
-                  fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.circle(0.20,0.10,color='orange',size=8)
-              elif width == 158:
+                    oob_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(oob_text_add_1)
 
+                    oob_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
+                    fig.add_layout(oob_text_add_2)
 
-                  oob_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '6pt')
 
-                  fig.add_layout(oob_text_add_1)
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  oob_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '6pt')
+                    fig.circle(0.20,0.10,color='orange',size=8)
+                elif width == 158:
 
-                  fig.add_layout(oob_text_add_2)
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
 
-                  fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.20,0.10,color='orange',size=8)
-              elif width == 135:
+                    oob_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '6pt')
 
-                  oob_text_1 = "OOB (AUC ="
-                  oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
+                    fig.add_layout(oob_text_add_1)
 
+                    oob_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '6pt')
 
-                  oob_text_add_1 = Label(x=0.28, y=0.09,
-                                   text=oob_text_1, render_mode='css', text_font_size= '5pt')
+                    fig.add_layout(oob_text_add_2)
 
-                  fig.add_layout(oob_text_add_1)
 
-                  oob_text_add_2 = Label(x=0.28, y=0.00,
-                                   text=oob_text_2, render_mode='css', text_font_size= '5pt')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.add_layout(oob_text_add_2)
+                    fig.circle(0.20,0.10,color='orange',size=8)
+                elif width == 135:
 
+                    oob_text_1 = "OOB (AUC ="
+                    oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_oob[2],(auc_oob[1] - auc_oob[0])/2)
 
-                  fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
 
-                  fig.circle(0.20,0.10,color='orange',size=8)
-              else:
-                  fig.legend.location = "bottom_right"
-                  fig.legend.visible = True
+                    oob_text_add_1 = Label(x=0.28, y=0.09,
+                                     text=oob_text_1, render_mode='canvas', text_font_size= '5pt')
+
+                    fig.add_layout(oob_text_add_1)
+
+                    oob_text_add_2 = Label(x=0.28, y=0.00,
+                                     text=oob_text_2, render_mode='canvas', text_font_size= '5pt')
+
+                    fig.add_layout(oob_text_add_2)
+
+
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+
+                    fig.circle(0.20,0.10,color='orange',size=8)
+                else:
+                    fig.legend.location = "bottom_right"
+                    fig.legend.visible = True
 
 
     return fig
@@ -1060,9 +1147,9 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
     # Figure: add line
     # fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal Distribution Line")
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5)
+    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=2.5)
     if plot_num in [0, 1, 2, 4]:
-        figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.6, legend="FULL (AUC = {:.2f})".format(auc_full), source=source)
+        figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.8, legend="FULL (AUC = {:.2f})".format(auc_full), source=source)
         fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111}")]))
     else:
         pass
@@ -1124,7 +1211,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
     source2 = ColumnDataSource(data=data2)
 
     if plot_num in [0, 1, 3, 4]:
-        figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.6, legend="CV (AUC = {:.2f} +/- {:.2f})".format(auc_medci, auc_ci,), source=source2)
+        figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.8, legend="CV (AUC = {:.2f} +/- {:.2f})".format(auc_medci, auc_ci,), source=source2)
         fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
 
         # Figure: add 95CI band
@@ -1168,12 +1255,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
         if plot_num in [0,1,4]:
             if width == 475:
                 ib_text_add = Label(x=0.52, y=0.15,
-                                 text=ib_text, render_mode='css', text_font_size= '10pt')
+                                 text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(ib_text_add)
 
                 oob_text_add = Label(x=0.52, y=0.05,
-                                 text=oob_text, render_mode='css', text_font_size= '10pt')
+                                 text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(oob_text_add)
 
@@ -1184,12 +1271,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.circle(0.47,0.07,color='orange',size=8)
             elif width == 316:
                 ib_text_add = Label(x=0.30, y=0.15,
-                                 text=ib_text, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add)
 
                 oob_text_add = Label(x=0.30, y=0.05,
-                                 text=oob_text, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add)
 
@@ -1207,22 +1294,22 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.38, y=0.28,
-                                 text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.38, y=0.19,
-                                 text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_2)
 
                 oob_text_add_1 = Label(x=0.38, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.38, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1240,22 +1327,22 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.28, y=0.32,
-                                 text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.28, y=0.23,
-                                 text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_2)
 
                 oob_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1273,22 +1360,22 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.28, y=0.32,
-                                 text=ib_text_1, render_mode='css', text_font_size= '6pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.28, y=0.23,
-                                 text=ib_text_2, render_mode='css', text_font_size= '6pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(ib_text_add_2)
 
                 oob_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '6pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '6pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1306,22 +1393,22 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.28, y=0.32,
-                                 text=ib_text_1, render_mode='css', text_font_size= '5pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.28, y=0.23,
-                                 text=ib_text_2, render_mode='css', text_font_size= '5pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(ib_text_add_2)
 
                 oob_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '5pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '5pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1336,7 +1423,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
         elif plot_num == 2:
             if width == 475:
                 ib_text_add = Label(x=0.52, y=0.03,
-                                 text=ib_text, render_mode='css', text_font_size= '10pt')
+                                 text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(ib_text_add)
 
@@ -1345,7 +1432,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.circle(0.47,0.05,color='green',size=8)
             elif width == 316:
                 ib_text_add = Label(x=0.40, y=0.02,
-                                 text=ib_text, render_mode='css', text_font_size= '10pt')
+                                 text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(ib_text_add)
 
@@ -1358,12 +1445,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.38, y=0.09,
-                                 text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.38, y=0.00,
-                                 text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
 
                 fig.add_layout(ib_text_add_2)
@@ -1377,12 +1464,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=ib_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=ib_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(ib_text_add_2)
 
@@ -1396,12 +1483,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=ib_text_1, render_mode='css', text_font_size= '6pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.28, y=0,
-                                 text=ib_text_2, render_mode='css', text_font_size= '6pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(ib_text_add_2)
 
@@ -1415,12 +1502,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 ib_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=ib_text_1, render_mode='css', text_font_size= '5pt')
+                                 text=ib_text_1, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(ib_text_add_1)
 
                 ib_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=ib_text_2, render_mode='css', text_font_size= '5pt')
+                                 text=ib_text_2, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(ib_text_add_2)
 
@@ -1436,7 +1523,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
         elif plot_num == 3:
             if width == 475:
                 oob_text_add = Label(x=0.52, y=0.03,
-                                 text=oob_text, render_mode='css', text_font_size= '10pt')
+                                 text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(oob_text_add)
 
@@ -1448,7 +1535,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
             elif width == 316:
 
                 oob_text_add = Label(x=0.27, y=0.02,
-                                 text=oob_text, render_mode='css', text_font_size= '10pt')
+                                 text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(oob_text_add)
 
@@ -1463,12 +1550,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 oob_text_add_1 = Label(x=0.38, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.38, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1482,12 +1569,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_cv1, auc_cv2)
 
                 oob_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '6.8pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1503,12 +1590,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 oob_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '6pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '6pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '6pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1522,12 +1609,12 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
 
                 oob_text_add_1 = Label(x=0.28, y=0.09,
-                                 text=oob_text_1, render_mode='css', text_font_size= '5pt')
+                                 text=oob_text_1, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(oob_text_add_1)
 
                 oob_text_add_2 = Label(x=0.28, y=0.00,
-                                 text=oob_text_2, render_mode='css', text_font_size= '5pt')
+                                 text=oob_text_2, render_mode='canvas', text_font_size= '5pt')
 
                 fig.add_layout(oob_text_add_2)
 
@@ -1682,3 +1769,44 @@ def bca_method(bootstat, stat, jackstat):
         boot_ci = np.array(boot_ci)
 
     return boot_ci
+
+
+def get_sens_spec(Ytrue, Yscore, cuttoff_val):
+    """Get sensitivity and specificity from cutoff value."""
+    Yscore_round = np.where(np.array(Yscore) > cuttoff_val, 1, 0)
+    tn, fp, fn, tp = metrics.confusion_matrix(Ytrue, Yscore_round).ravel()
+    sensitivity = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+    return sensitivity, specificity
+
+
+def get_sens_cuttoff(Ytrue, Yscore, specificity_val):
+    """Get sensitivity and cuttoff value from specificity."""
+    fpr0 = 1 - specificity_val
+    fpr, sensitivity, thresholds = metrics.roc_curve(Ytrue, Yscore, pos_label=1, drop_intermediate=False)
+    idx = np.abs(fpr - fpr0).argmin()  # this find the closest value in fpr to fpr0
+    # Check that this is not a perfect roc curve
+    # If it is perfect, allow sensitivity = 1, rather than 0
+    if specificity_val == 1 and sensitivity[idx] == 0:
+        for i in range(len(fpr)):
+            if fpr[i] == 1 and sensitivity[i] == 1:
+                return 1, 0.5
+    return sensitivity[idx], thresholds[idx]
+
+
+def get_spec_sens_cuttoff(Ytrue, Yscore, metric, val):
+    """Return specificity, sensitivity, cutoff value provided the metric and value used."""
+    if metric == "specificity":
+        specificity = val
+        sensitivity, threshold = get_sens_cuttoff(Ytrue, Yscore, val)
+    elif metric == "cutoffscore":
+        threshold = val
+        sensitivity, specificity = get_sens_spec(Ytrue, Yscore, val)
+    return specificity, sensitivity, threshold
+
+
+def get_stats(Ytrue, Yscore, specificity, parametric):
+    """Calculates binary metrics given the specificity."""
+    sensitivity, cutoffscore = get_sens_cuttoff(Ytrue, Yscore, specificity)
+    stats = binary_metrics(Ytrue, Yscore, cut_off=cutoffscore, parametric=parametric)
+    return stats

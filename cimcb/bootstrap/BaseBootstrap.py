@@ -10,6 +10,8 @@ from pydoc import locate
 from joblib import Parallel, delayed
 from bokeh.layouts import column
 import importlib
+from bokeh.models.widgets import DataTable, Div, TableColumn
+from bokeh.layouts import column, layout, widgetbox
 from sklearn.linear_model import LinearRegression
 from itertools import combinations
 from ..plot import scatterCI, boxplot, distribution, scatter, scatter_ellipse
@@ -27,7 +29,7 @@ from bokeh.models import Div
 from itertools import combinations
 from sklearn.utils import resample
 from ..plot import scatterCI, boxplot, distribution, roc_boot
-from ..utils import color_scale, dict_perc, nested_getattr, dict_95ci, dict_median_scores, binary_metrics
+from ..utils import color_scale, dict_perc, nested_getattr, dict_95ci, dict_median_scores, binary_metrics, binary_evaluation
 
 
 class BaseBootstrap(ABC):
@@ -173,10 +175,12 @@ class BaseBootstrap(ABC):
 
         return [bootstatloop, bootstatloop_oob]
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', test=None):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', testset=None, show_table=True):
+
+        test = testset
 
         if test is not None:
-            bm = binary_metrics(test[0], test[1])
+            bm = binary_evaluation(test[0], test[1])
             self.test = []
             for key, value in bm.items():
                 self.test.append(value)
@@ -278,19 +282,63 @@ class BaseBootstrap(ABC):
             jackstat = None
             jackidx = None
 
-        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test)
+        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table)
 
         stats_table = pd.DataFrame(self.bootci['metrics'],
-                                   columns=['LowCI', 'UppCI', 'Median'],
+                                   columns=['IBLowCI', 'IBUppCI', 'IBMedian'],
                                    index=self.model_orig.metrics_key)
+        stats_table['OOBLowCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 2.5, axis=0)
+        stats_table['OOBUppCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 97.5, axis=0)
+        stats_table['OOBMidCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 50, axis=0)
+
         stats_table['Train'] = self.stat['metrics']
 
         if self.test is not None:
             stats_table['Test'] = self.test
 
         self.table = stats_table
+        for i in self.table:
+            self.table[i][0] = np.round(self.table[i][0], 2)
+            self.table[i][1] = np.round(self.table[i][1], 2)
+            if self.table[i][2] > 0.01:
+                self.table[i][2] = "%0.2f" % self.table[i][2]
+            else:
+                self.table[i][2] = "%0.2e" % self.table[i][2]
 
-        fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
+        if show_table == False:
+            fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
+        else:
+            table = self.table
+
+            tabledata = dict(
+                evaluate=[["Train IB"]],
+                manw_pval=[["{}".format(table['Train'][2])]],
+                auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
+                R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
+            )
+
+            # Append test data
+            tabledata["evaluate"].append(["Train OOB"])
+            tabledata["manw_pval"].append([table['OOBMidCI'][2]])
+            tabledata["auc"].append(["{} ({}, {})".format(table['OOBMidCI'][1], table['OOBLowCI'][1], table['OOBUppCI'][1])]),
+            tabledata["R2"].append(["{} ({}, {})".format(table['OOBMidCI'][0], table['OOBLowCI'][0], table['OOBUppCI'][0])]),
+
+            if self.test is not None:
+                tabledata["evaluate"].append(["Test"])
+                tabledata["manw_pval"].append([table['Test'][2]])
+                tabledata["auc"].append(["{}".format(table['Test'][1])]),
+                tabledata["R2"].append(["{}".format(table['Test'][0])]),
+            columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC")]
+
+            source = ColumnDataSource(data=tabledata)
+            if self.test is not None:
+                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=140), width=950, height=130)
+            else:
+                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+            self.table = pd.DataFrame(tabledata)
+            fig1 = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
+            fig = layout(fig1, [table_bokeh])
+
         output_notebook()
         show(fig)
 
@@ -670,16 +718,6 @@ class BaseBootstrap(ABC):
         return Peaksheet
 
     def save_results(self, name="table.xlsx"):
-
-        stats_table = pd.DataFrame(self.bootci['metrics'],
-                                   columns=['LowCI', 'UppCI', 'Median'],
-                                   index=self.model_orig.metrics_key)
-        stats_table['Train'] = self.stat['metrics']
-
-        if self.test is not None:
-            stats_table['Test'] = self.test
-
-        self.table = stats_table
 
         table = self.table
         check_type = name.split(".")

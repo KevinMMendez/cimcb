@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from .BaseModel import BaseModel
+from ..utils import binary_metrics, binary_evaluation
 
 
 class PCR(BaseModel):
@@ -81,9 +82,16 @@ class PCR(BaseModel):
         self.X = X
         self.Y = Y
         self.Y_pred = y_pred_train
+        self.metrics_key = []
+        self.metrics = []
+        bm = binary_evaluation(Y, y_pred_train)
+        for key, value in bm.items():
+            self.metrics.append(value)
+            self.metrics_key.append(key)
+
         return y_pred_train
 
-    def test(self, X):
+    def test(self, X, Y=None):
         """Calculate and return Y predicted value.
 
         Parameters
@@ -104,4 +112,11 @@ class PCR(BaseModel):
         # Calculate and return Y predicted value
         newX = self.model.transform(X)
         y_pred_test = self.regrmodel.predict(newX).flatten()
+        # Calculate and return Y predicted value
+        if Y is not None:
+            self.metrics = []
+            bm = binary_evaluation(Y, y_pred_test)
+            for key, value in bm.items():
+                self.metrics.append(value)
+
         return y_pred_test

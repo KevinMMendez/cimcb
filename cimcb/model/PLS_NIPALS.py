@@ -28,7 +28,7 @@ from scipy import interp
 from sklearn import metrics
 from sklearn.utils import resample
 from ..plot import scatter, scatterCI, boxplot, distribution, permutation_test
-from ..utils import binary_metrics
+from ..utils import binary_metrics, binary_evaluation
 
 
 class PLS_NIPALS(BaseModel):
@@ -87,7 +87,7 @@ class PLS_NIPALS(BaseModel):
             Predicted y score for samples.
         """
         # Error check
-        #X, Y = self.input_check(X, Y)
+        # X, Y = self.input_check(X, Y)
 
         # Fit model
         self.model.fit(X, Y)
@@ -95,9 +95,9 @@ class PLS_NIPALS(BaseModel):
         # Calculate vip, pctvar (Explained variance in X) and flatten coef_ for future use
         # meanX = np.mean(X, axis=0)
         # X0 = X - meanX
-        #self.model.pctvar_ = sum(abs(self.model.x_loadings_) ** 2) / sum(sum(abs(X0) ** 2)) * 100
-        #self.model.vip_ = vip(self.model)
-        #self.model.coef_ = self.model.coef_.flatten()
+        # self.model.pctvar_ = sum(abs(self.model.x_loadings_) ** 2) / sum(sum(abs(X0) ** 2)) * 100
+        # self.model.vip_ = vip(self.model)
+        # self.model.coef_ = self.model.coef_.flatten()
         y_pred_train = self.model.predict(X).flatten()
 
         self.model.pctvar_ = []
@@ -138,6 +138,14 @@ class PLS_NIPALS(BaseModel):
         self.Y_true = Y
         self.X = X
         self.Y = Y  # Y vs. Y_true
+
+        self.metrics_key = []
+        self.metrics = []
+        bm = binary_evaluation(Y, y_pred_train)
+        for key, value in bm.items():
+            self.metrics.append(value)
+            self.metrics_key.append(key)
+
         return y_pred_train
 
     def test(self, X, Y=None):
@@ -159,8 +167,14 @@ class PLS_NIPALS(BaseModel):
 
         # Overwrite x_scores_ from model.fit with using test X (or do model.x_scores_test_) ?
         self.model.x_scores_ = self.model.transform(X)
-
         # Calculate and return Y predicted value
         y_pred_test = self.model.predict(X).flatten()
         self.Y_pred = y_pred_test
+
+        if Y is not None:
+            self.metrics = []
+            bm = binary_evaluation(Y, y_pred_test)
+            for key, value in bm.items():
+                self.metrics.append(value)
+
         return y_pred_test

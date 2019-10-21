@@ -240,7 +240,7 @@ class BaseModel(ABC):
         #     Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
         # return Peaksheet
 
-    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None, bootmethod='BCA', show_table=True):
+    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None, bootmethod='BCA'):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
         Parameters
@@ -299,9 +299,9 @@ class BaseModel(ABC):
 
         # ROC plot
         if test is None:
-            roc_bokeh, stat = roc(Ytrue_train, Yscore_train, bootnum=bootnum, width=320, height=315, method=bootmethod, legend_basic=show_table)
+            roc_bokeh = roc(Ytrue_train, Yscore_train, bootnum=bootnum, width=320, height=315, method=bootmethod)
         else:
-            roc_bokeh, stat = roc(Ytrue_train, Yscore_train, test=test, bootnum=bootnum, width=320, height=315,  method=bootmethod, legend_basic=show_table)
+            roc_bokeh = roc(Ytrue_train, Yscore_train, test=test, bootnum=bootnum, width=320, height=315,  method=bootmethod)
 
         # Violin plot
         self.score = Yscore_train
@@ -318,65 +318,8 @@ class BaseModel(ABC):
         else:
             dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, smooth=dist_smooth, font_size="10pt", label_font_size="10pt")
 
-        self.stat = np.array(stat)
-        if bootnum > 1:
-            self.table = pd.DataFrame(np.array(stat)[:3,:],
-                                       columns=['TrainLowCI', 'TrainUppCI', 'Train'],
-                                       index=['R²', 'AUC', 'ManW P-Value'])
-        else:
-            self.table = pd.DataFrame(np.array(stat)[:3,:].T,
-                                   columns=['TrainLowCI', 'TrainUppCI', 'Train'],
-                                   index=['R²', 'AUC', 'ManW P-Value'])
-        if test is None:
-            pass
-        else:
-            self.table["Test"] = np.array(stat)[3,:]
-
-        for i in self.table:
-            self.table[i][0] = np.round(self.table[i][0], 2)
-            self.table[i][1] = np.round(self.table[i][1], 2)
-            if self.table[i][2] > 0.01:
-                self.table[i][2] = "%0.2f" % self.table[i][2]
-            else:
-                self.table[i][2] = "%0.2e" % self.table[i][2]
-
         # Combine table, violin plot and roc plot into one figure
-        if show_table == False:
-            fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]]) # roc_bokeh
-        else:
-            table = self.table
-
-            if bootnum > 1:
-                tabledata = dict(
-                    evaluate=[["Train"]],
-                    manw_pval=[["{}".format(table['Train'][2])]],
-                    auc=[["{} ({}, {})".format(table['Train'][1], table['TrainLowCI'][1], table['TrainUppCI'][1])]],
-                    R2=[["{} ({}, {})".format(table['Train'][0], table['TrainLowCI'][0], table['TrainUppCI'][0])]],
-                )
-            else:
-                tabledata = dict(
-                    evaluate=[["Train"]],
-                    manw_pval=[["{}".format(table['Train'][2])]],
-                    auc=[["{}".format(table['Train'][1])]],
-                    R2=[["{}".format(table['Train'][0])]],
-                )
-
-            if test is not None:
-                tabledata["evaluate"].append(["Test"])
-                tabledata["manw_pval"].append([table['Test'][2]])
-                tabledata["auc"].append(["{}".format(table['Test'][1])]),
-                tabledata["R2"].append(["{}".format(table['Test'][0])]),
-            columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC")]
-
-            source = ColumnDataSource(data=tabledata)
-            if self.test is not None:
-                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
-            else:
-                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
-
-            fig1 = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
-            fig = layout(fig1, [table_bokeh])
-
+        fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]]) # roc_bokeh
         output_notebook()
         show(fig)
 

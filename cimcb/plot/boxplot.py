@@ -18,7 +18,10 @@ def boxplot(X, group, violin=False, title="", xlabel="Group", ylabel="Value", fo
     """
 
     if label is None:
-        label = ['0', '1', '0', '1']
+        if len(np.unique(group)) == 4:
+            label = ['0', '1', '0', '1']
+        else:
+            label = ['0', '1']
 
     if group_name_sort is None:
         group_name_sort = [str(i) for i in list(set(group))]

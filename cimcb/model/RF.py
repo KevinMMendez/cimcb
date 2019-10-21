@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 from .BaseModel import BaseModel
+from ..utils import binary_metrics, binary_evaluation
 
 
 class RF(BaseModel):
@@ -61,9 +62,17 @@ class RF(BaseModel):
         self.X = X
         self.Y = Y
         self.Y_pred = y_pred_train
+
+        self.metrics_key = []
+        self.metrics = []
+        bm = binary_evaluation(Y, y_pred_train)
+        for key, value in bm.items():
+            self.metrics.append(value)
+            self.metrics_key.append(key)
+
         return y_pred_train
 
-    def test(self, X):
+    def test(self, X, Y=None):
         """Calculate and return Y predicted value.
 
         Parameters
@@ -83,4 +92,11 @@ class RF(BaseModel):
 
         # Calculate and return Y predicted value
         y_pred_test = np.array(self.model.predict_proba(X)[:, self.pred_index])
+
+        if Y is not None:
+            self.metrics = []
+            bm = binary_evaluation(Y, y_pred_test)
+            for key, value in bm.items():
+                self.metrics.append(value)
+
         return y_pred_test

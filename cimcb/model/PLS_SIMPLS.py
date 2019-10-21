@@ -10,7 +10,7 @@ from bokeh.plotting import ColumnDataSource, figure
 from .BaseModel import BaseModel
 from ..plot import permutation_test
 from ..plot import scatter, distribution, boxplot
-from ..utils import binary_metrics
+from ..utils import binary_metrics, binary_evaluation
 
 
 class PLS_SIMPLS(BaseModel):
@@ -108,7 +108,7 @@ class PLS_SIMPLS(BaseModel):
 
         self.metrics_key = []
         self.metrics = []
-        bm = binary_metrics(Y, y_pred_train)
+        bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
             self.metrics.append(value)
             self.metrics_key.append(key)
@@ -147,7 +147,7 @@ class PLS_SIMPLS(BaseModel):
 
         if Y is not None:
             self.metrics = []
-            bm = binary_metrics(Y, y_pred_test)
+            bm = binary_evaluation(Y, y_pred_test)
             for key, value in bm.items():
                 self.metrics.append(value)
 

@@ -10,7 +10,7 @@ from sklearn.metrics import r2_score
 from keras import backend as K
 from keras.constraints import max_norm, non_neg, min_max_norm, unit_norm
 from .BaseModel import BaseModel
-from ..utils import YpredCallback
+from ..utils import YpredCallback, binary_metrics, binary_evaluation
 
 
 class NN_LinearSigmoid(BaseModel):
@@ -113,6 +113,13 @@ class NN_LinearSigmoid(BaseModel):
         self.Y_pred = y_pred_train
         self.X = X
         self.Y = Y
+        self.metrics_key = []
+        self.metrics = []
+        bm = binary_evaluation(Y, y_pred_train)
+        for key, value in bm.items():
+            self.metrics.append(value)
+            self.metrics_key.append(key)
+
         return y_pred_train
 
     def test(self, X, Y=None):
@@ -139,6 +146,12 @@ class NN_LinearSigmoid(BaseModel):
         #self.model.y_scores = np.matmul(self.model.x_scores_alt, self.model.y_loadings_) + layer2_bias
         y_pred_test = self.model.predict(X).flatten()
         self.Y_pred = y_pred_test
+        # Calculate and return Y predicted value
+        if Y is not None:
+            self.metrics = []
+            bm = binary_evaluation(Y, y_pred_test)
+            for key, value in bm.items():
+                self.metrics.append(value)
 
         return y_pred_test
 
