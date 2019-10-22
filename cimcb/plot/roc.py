@@ -48,7 +48,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         pos = 0
 
     # Set Linspace for FPR
-    fpr_linspace = np.linspace(0, 1, 100)  # Make it 1000
+    fpr_linspace = np.linspace(0, 1, 1000)  # Make it 1000
 
     # Calculate for STAT
     fpr_stat, tpr_stat, _ = metrics.roc_curve(Y, stat, pos_label=pos, drop_intermediate=False)
@@ -240,7 +240,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
                  y_axis_label=ylabel,
                  x_range=(-0.06, 1.06),
                  y_range=(-0.06, 1.06))
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=3)  # Equal Distribution Line
+    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=1)  # Equal Distribution Line
 
     # Plot IB
     data_ib = {"x": fpr_linspace,
@@ -260,7 +260,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         figline_ib = fig.line("x",
                               "y",
                               color="green",
-                              line_width=3,
+                              line_width=2.5,
                               alpha=0.8,
                               legend=legend_ib,
                               source=source_ib)
@@ -273,7 +273,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
                           upper="uppci",
                           level="underlay",
                           fill_alpha=0.1,
-                          line_width=1,
+                          line_width=0.5,
                           line_color="black",
                           fill_color="green",
                           source=source_ib)
@@ -287,7 +287,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
         figline_ib = fig.line("x",
                               "y",
                               color="green",
-                              line_width=3,
+                              line_width=2.5,
                               alpha=0.8,
                               legend=legend_ib,
                               source=source_ib)
@@ -312,7 +312,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       figline_test = fig.line("x",
                             "y",
                             color="purple",
-                            line_width=3,
+                            line_width=2.5,
                             alpha=0.8,
                             legend=legend_oob,
                             source=source_test,
@@ -399,20 +399,22 @@ def roc_boot(Y,
         pos = 0
 
     # Set Linspace for FPR
-    fpr_linspace = np.linspace(0, 1, 100)  # Make it 1000
+    fpr_linspace = np.linspace(0, 1, 1000)  # Make it 1000
 
     # Calculate for STAT
     fpr_stat, tpr_stat, _ = metrics.roc_curve(Y, stat, pos_label=pos, drop_intermediate=False)
     auc_stat = metrics.auc(fpr_stat, tpr_stat)
 
     # Drop intermediates when fpr = 0
-    tpr0_stat = tpr_stat[fpr_stat == 0][-1]
-    tpr_stat = np.concatenate([[tpr0_stat], tpr_stat[fpr_stat > 0]])
-    fpr_stat = np.concatenate([[0], fpr_stat[fpr_stat > 0]])
+    # tpr0_stat = tpr_stat[fpr_stat == 0][-1]
+    # tpr_stat = np.concatenate([[tpr0_stat], tpr_stat[fpr_stat > 0]])
+    # fpr_stat = np.concatenate([[0], fpr_stat[fpr_stat > 0]])
 
-    # Vertical averaging
-    idx = [np.abs(i - fpr_stat).argmin() for i in fpr_linspace]
-    tpr_list = np.array(tpr_stat[idx])
+    # # Vertical averaging
+    # idx = [np.abs(i - fpr_stat).argmin() for i in fpr_linspace]
+    # tpr_list = np.array(tpr_stat[idx])
+    tpr_stat = interp(fpr_linspace, fpr_stat, tpr_stat)
+    tpr_list = tpr_stat
 
     # Calculate for BOOTSTAT (IB)
     pos_loop = []
@@ -430,13 +432,16 @@ def roc_boot(Y,
           pos_loop.append(abs(1 - pos))
 
         # Drop intermediates when fpr = 0
-        tpr0_boot = tpr_boot[fpr_boot == 0][-1]
-        tpr_boot = np.concatenate([[tpr0_boot], tpr_boot[fpr_boot > 0]])
-        fpr_boot = np.concatenate([[0], fpr_boot[fpr_boot > 0]])
+        # tpr0_boot = tpr_boot[fpr_boot == 0][-1]
+        # tpr_boot = np.concatenate([[tpr0_boot], tpr_boot[fpr_boot > 0]])
+        # fpr_boot = np.concatenate([[0], fpr_boot[fpr_boot > 0]])
 
-        # Vertical averaging
-        idx = [np.abs(i - fpr_boot).argmin() for i in fpr_linspace]
-        tpr_bootstat.append(np.array(tpr_boot[idx]))
+        # # Vertical averaging
+        # idx = [np.abs(i - fpr_boot).argmin() for i in fpr_linspace]
+        # tpr_bootstat.append(np.array(tpr_boot[idx]))
+
+        tpr_boot = interp(fpr_linspace, fpr_boot, tpr_boot)
+        tpr_bootstat.append(tpr_boot)
 
     if method == 'BCA':
         tpr_jackstat = []
@@ -461,20 +466,23 @@ def roc_boot(Y,
     if method == 'BCA':
         tpr_ib = bca_method(tpr_bootstat, tpr_list, tpr_jackstat)
         tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+        tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     if method == 'Per':
         tpr_ib = per_method(tpr_bootstat, tpr_list)
         tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+        tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     if method == 'CPer':
         tpr_ib = cper_method(tpr_bootstat, tpr_list)
         tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+        tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     # ROC up
-    for i in range(len(tpr_ib.T)):
-        for j in range(1, len(tpr_ib)):
-            if tpr_ib[j, i] < tpr_ib[j - 1, i]:
-                tpr_ib[j, i] = tpr_ib[j - 1, i]
+    # for i in range(len(tpr_ib.T)):
+    #     for j in range(1, len(tpr_ib)):
+    #         if tpr_ib[j, i] < tpr_ib[j - 1, i]:
+    #             tpr_ib[j, i] = tpr_ib[j - 1, i]
 
     # Get tpr mid
     if method != 'Per':
@@ -489,23 +497,32 @@ def roc_boot(Y,
         Ytrue_boot_oob = Y[bootidx_oob[i]]
         fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=pos, drop_intermediate=False)
         auc_boot_oob = metrics.auc(fpr_boot_oob, tpr_boot_oob)
-        # if auc_boot_oob < 0.5:
-        #   fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=abs(1-pos_loop[i]), drop_intermediate=False)
+        if auc_boot_oob < 0.5:
+          fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=abs(1-pos_loop[i]), drop_intermediate=False)
         auc_boot_oob = metrics.auc(fpr_boot_oob, tpr_boot_oob)
         auc_bootstat_oob.append(auc_boot_oob)
 
         # Drop intermediates when fpr = 0
-        tpr0_boot_oob = tpr_boot_oob[fpr_boot_oob == 0][-1]
-        tpr_boot_oob = np.concatenate([[tpr0_boot_oob], tpr_boot_oob[fpr_boot_oob > 0]])
-        fpr_boot_oob = np.concatenate([[0], fpr_boot_oob[fpr_boot_oob > 0]])
+        # tpr0_boot_oob = tpr_boot_oob[fpr_boot_oob == 0][-1]
+        # tpr_boot_oob = np.concatenate([[tpr0_boot_oob], tpr_boot_oob[fpr_boot_oob > 0]])
+        # fpr_boot_oob = np.concatenate([[0], fpr_boot_oob[fpr_boot_oob > 0]])
 
-        # Vertical averaging
-        idx_oob = [np.abs(i - fpr_boot_oob).argmin() for i in fpr_linspace]
-        tpr_bootstat_oob.append(np.array(tpr_boot_oob[idx_oob]))
+        # # Vertical averaging
+        # idx_oob = [np.abs(i - fpr_boot_oob).argmin() for i in fpr_linspace]
+        # tpr_bootstat_oob.append(np.array(tpr_boot_oob[idx_oob]))
+        tpr_boot_oob = interp(fpr_linspace, fpr_boot_oob, tpr_boot_oob)
+        tpr_bootstat_oob.append(tpr_boot_oob)
 
-    tpr_oob = per_method(tpr_bootstat_oob, tpr_list)
+    # Get CI for tpr
+    tpr_oob_lowci = np.percentile(tpr_bootstat_oob, 2.5, axis=0)
+    tpr_oob_medci = np.percentile(tpr_bootstat_oob, 50, axis=0)
+    tpr_oob_uppci = np.percentile(tpr_bootstat_oob, 97.5, axis=0)
+    tpr_oob = np.array([tpr_oob_lowci, tpr_oob_uppci, tpr_oob_medci]).T
+
+    #tpr_oob = per_method(tpr_bootstat_oob, tpr_list)
     auc_oob = per_method(auc_bootstat_oob, auc_stat)
     tpr_oob = np.concatenate((np.zeros((1, 3)), tpr_oob), axis=0)  # Add starting 0
+    tpr_oob = np.concatenate((tpr_oob, np.ones((1, 3))), axis=0)  # Add end 1
 
     # ROC up
     for i in range(len(tpr_oob.T)):
@@ -529,9 +546,11 @@ def roc_boot(Y,
       idx_test = [np.abs(i - fpr_test).argmin() for i in fpr_linspace]
       tpr_test = tpr_test[idx_test]
       tpr_test = np.insert(tpr_test, 0, 0) # Add starting 0
+      tpr_test = np.concatenate((tpr_test,[1]))
 
 
     fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
+    fpr_linspace  = np.concatenate((fpr_linspace, [1]))  # Add end 1
 
     # if 'data' plot original data instead of median
     if plot == 'data':
@@ -559,6 +578,9 @@ def roc_boot(Y,
     auc_oob_mid = metrics.auc(fpr_linspace, tpr_oob[:, 2])
     auc_oob = np.array([auc_oob_low, auc_oob_upp, auc_oob_mid])
 
+    # print("AUC IB {} ({},{})".format(auc_ib[2], auc_ib[0], auc_ib[1]))
+    # print("AUC OOB {} ({},{})".format(auc_oob[2], auc_oob[0], auc_oob[1]))
+
     # Smooth if set
     if smoothval > 1:
         tpr_ib[:, 0] = smooth(tpr_ib[:, 0], smoothval)
@@ -581,7 +603,7 @@ def roc_boot(Y,
                  y_axis_label=ylabel,
                  x_range=(-0.06, 1.06),
                  y_range=(-0.06, 1.06))
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=3)  # Equal Distribution Line
+    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=1)
 
     # Plot IB
     data_ib = {"x": fpr_linspace,
@@ -603,7 +625,7 @@ def roc_boot(Y,
         figline_ib = fig.line("x",
                               "y",
                               color="green",
-                              line_width=3,
+                              line_width=2.5,
                               alpha=0.8,
                               legend=legend_text,
                               source=source_ib)
@@ -616,7 +638,7 @@ def roc_boot(Y,
                           upper="uppci",
                           level="underlay",
                           fill_alpha=0.1,
-                          line_width=1,
+                          line_width=0.5,
                           line_color="black",
                           fill_color="green",
                           source=source_ib)
@@ -642,7 +664,7 @@ def roc_boot(Y,
         figline = fig.line("x",
                            "y",
                            color="orange",
-                           line_width=3,
+                           line_width=2.5,
                            alpha=0.8,
                            legend=legend_text,
                            source=source_oob)
@@ -656,7 +678,7 @@ def roc_boot(Y,
                            upper="uppci",
                            level="underlay",
                            fill_alpha=0.1,
-                           line_width=1,
+                           line_width=0.5,
                            line_color="black",
                            fill_color="orange",
                            source=source_oob)
@@ -679,7 +701,7 @@ def roc_boot(Y,
       figline_test = fig.line("x",
                             "y",
                             color="purple",
-                            line_width=3,
+                            line_width=2.5,
                             alpha=0.8,
                             legend=legend_text,
                             line_dash="dashed",
@@ -1147,9 +1169,9 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
     # Figure: add line
     # fig.line([0, 1], [0, 1], color="black", line_dash="dashed", line_width=2.5, legend="Equal Distribution Line")
-    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=2.5)
+    fig.line([0, 1], [0, 1], color="black", line_dash="dashed", alpha=0.8, line_width=1)
     if plot_num in [0, 1, 2, 4]:
-        figline = fig.line("x", "y", color="green", line_width=3.5, alpha=0.8, legend="FULL (AUC = {:.2f})".format(auc_full), source=source)
+        figline = fig.line("x", "y", color="green", line_width=2.5, alpha=0.8, legend="FULL (AUC = {:.2f})".format(auc_full), source=source)
         fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111}")]))
     else:
         pass
@@ -1211,11 +1233,11 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
     source2 = ColumnDataSource(data=data2)
 
     if plot_num in [0, 1, 3, 4]:
-        figline = fig.line("x", "y", color="orange", line_width=3.5, alpha=0.8, legend="CV (AUC = {:.2f} +/- {:.2f})".format(auc_medci, auc_ci,), source=source2)
+        figline = fig.line("x", "y", color="orange", line_width=2.5, alpha=0.8, legend="CV (AUC = {:.2f} +/- {:.2f})".format(auc_medci, auc_ci,), source=source2)
         fig.add_tools(HoverTool(renderers=[figline], tooltips=[("Specificity", "@spec{1.111}"), ("Sensitivity", "@y{1.111} (+/- @ci{1.111})")]))
 
         # Figure: add 95CI band
-        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=1, line_color="black", fill_color="orange", source=source2)
+        figband = Band(base="x", lower="lowci", upper="uppci", level="underlay", fill_alpha=0.1, line_width=0.5, line_color="black", fill_color="orange", source=source2)
         fig.add_layout(figband)
     else:
         pass

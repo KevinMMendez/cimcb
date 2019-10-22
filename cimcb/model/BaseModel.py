@@ -240,7 +240,7 @@ class BaseModel(ABC):
         #     Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
         # return Peaksheet
 
-    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=100, title_align="left", dist_smooth=None, bootmethod='BCA', show_table=True):
+    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=0, title_align="left", dist_smooth=None, bootmethod='BCA', show_table=True):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
         Parameters
