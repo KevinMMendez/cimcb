@@ -108,7 +108,7 @@ class KFold(BaseCrossVal):
         x_scores_full = model_i.model.x_scores_
         y_loadings_ = model_i.model.y_loadings_
         pctvar_ = model_i.model.pctvar_
-        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_LinearSigmoid":
             w1 = model_i.model.w1
             w2 = model_i.model.w2
         else:
@@ -123,7 +123,7 @@ class KFold(BaseCrossVal):
         model_i = self.model()
         model_i.set_params(params_i)
         # Full
-        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_LinearSigmoid":
             model_i.train(self.X, self.Y, w1=self.loop_w1[i], w2=self.loop_w2[i])
         else:
             model_i.train(self.X, self.Y)
@@ -195,7 +195,7 @@ class KFold(BaseCrossVal):
                 X_train = X[train, :]
                 Y_train = Y[train]
                 X_test = X[test, :]
-                if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
+                if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_LinearSigmoid":
                     model_i.compiled = True
                     model_i.train(X_train, Y_train, w1=w1, w2=w2)
                 else:
