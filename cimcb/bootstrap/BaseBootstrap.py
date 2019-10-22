@@ -40,7 +40,7 @@ class BaseBootstrap(ABC):
         self.X = model.X
         self.Y = model.Y
         self.name = model.__name__
-        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             self.w1 = model.model.w1
             self.w2 = model.model.w2
         self.bootlist = model.bootlist
@@ -152,7 +152,7 @@ class BaseBootstrap(ABC):
         X_res = self.X[self.bootidx[i], :]
         Y_res = self.Y[self.bootidx[i]]
         # Train and test
-        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             model_i.train(X_res, Y_res, w1=self.w1, w2=self.w2)
         else:
             model_i.train(X_res, Y_res)
@@ -390,7 +390,7 @@ class BaseBootstrap(ABC):
 
         a = [None] * 2
 
-        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             lv_name = "Neuron"
         else:
             lv_name = "LV"
@@ -452,7 +452,7 @@ class BaseBootstrap(ABC):
         else:
             raise ValueError("plot has to be either 'ci', 'meanci', 'ib', 'oob', 'all'.")
 
-        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             lv_name = "Neuron"
         else:
             lv_name = "LV"
@@ -685,7 +685,7 @@ class BaseBootstrap(ABC):
             mid_coef = self.bootci['model.coef_'][:, 2]
             mid_vip = self.bootci['model.vip_'][:, 2]
 
-        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             name_coef = "Feature Importance: Connection Weight"
             name_vip = "Feature Importance: Garlson's Algorithm"
         else:
