@@ -183,7 +183,7 @@ class BaseCrossVal(ABC):
                 perfect_param[key] = value[0]
         p = np.where(np.array(perfect_param) == self.param_list)[0][0]
 
-        if self.model.__name__ == 'NN_SigmoidSigmoid':
+        if self.model.__name__ == 'NN_SigmoidSigmoid' or self.model.__name__ == "NN_LinearSigmoid":
             lv_name = "Neuron"
         else:
             lv_name = "LV"
