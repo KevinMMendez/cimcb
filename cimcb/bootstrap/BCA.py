@@ -76,7 +76,7 @@ class BCA(BaseBootstrap):
         X_res = self.X[self.jackidx[i], :]
         Y_res = self.Y[self.jackidx[i]]
         # Train and test
-        if self.name == 'cimcb.model.NN_SigmoidSigmoid':
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             model_i.train(X_res, Y_res, w1=self.w1, w2=self.w2)
         else:
             model_i.train(X_res, Y_res)
