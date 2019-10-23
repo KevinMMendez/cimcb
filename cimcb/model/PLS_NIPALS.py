@@ -57,7 +57,7 @@ class PLS_NIPALS(BaseModel):
     parametric = True
     # bootlist = ["model.vip_", "model.coef_"]  # list of metrics to bootstrap
     # bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_"]  # list of metrics to bootstrap
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_"]
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.metrics"]
 
     def __init__(self, n_components=2):
         self.model = PLSRegression(n_components=n_components)  # Should change this to an empty model
@@ -140,10 +140,10 @@ class PLS_NIPALS(BaseModel):
         self.Y = Y  # Y vs. Y_true
 
         self.metrics_key = []
-        self.metrics = []
+        self.model.metrics = []
         bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
-            self.metrics.append(value)
+            self.model.metrics.append(value)
             self.metrics_key.append(key)
 
         return y_pred_train

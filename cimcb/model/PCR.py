@@ -30,7 +30,7 @@ class PCR(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.coef_"]  # list of metrics to bootstrap
+    bootlist = ["model.coef_", "Y_pred", "metrics"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2):
         self.model = PCA(n_components=n_components)

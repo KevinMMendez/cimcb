@@ -284,14 +284,14 @@ class BaseBootstrap(ABC):
 
         roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table)
 
-        stats_table = pd.DataFrame(self.bootci['metrics'],
+        stats_table = pd.DataFrame(self.bootci['model.eval_metrics_'],
                                    columns=['IBLowCI', 'IBUppCI', 'IBMidCI'],
                                    index=self.model_orig.metrics_key)
-        stats_table['OOBLowCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 2.5, axis=0)
-        stats_table['OOBUppCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 97.5, axis=0)
-        stats_table['OOBMidCI'] = np.percentile(np.array(self.bootstat_oob['metrics']), 50, axis=0)
+        stats_table['OOBLowCI'] = np.percentile(np.array(self.bootstat_oob['model.eval_metrics_']), 2.5, axis=0)
+        stats_table['OOBUppCI'] = np.percentile(np.array(self.bootstat_oob['model.eval_metrics_']), 97.5, axis=0)
+        stats_table['OOBMidCI'] = np.percentile(np.array(self.bootstat_oob['model.eval_metrics_']), 50, axis=0)
 
-        stats_table['Train'] = self.stat['metrics']
+        stats_table['Train'] = self.stat['model.eval_metrics_']
 
         if self.test is not None:
             stats_table['Test'] = self.test

@@ -100,7 +100,7 @@ class KFold(BaseCrossVal):
         model_i = self.model(**parami)
         # model_i.set_params(parami)
         # Full
-        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_LinearSigmoid":
+        if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid":
             model_i.compiled = False
         model_i.train(self.X, self.Y)
         ypred_full_i = model_i.test(self.X)

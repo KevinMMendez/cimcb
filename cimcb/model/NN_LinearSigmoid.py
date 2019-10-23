@@ -18,7 +18,7 @@ class NN_LinearSigmoid(BaseModel):
     """2 Layer linear-logistic neural network using Keras"""
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.pfi_acc_", "model.pfi_r2q2_", "model.pfi_auc_"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.pfi_acc_", "model.pfi_r2q2_", "model.pfi_auc_", "metrics"]  # list of metrics to bootstrap
 
     def __init__(self, n_neurons=2, epochs=200, learning_rate=0.01, momentum=0.0, decay=0.0, nesterov=False, loss="binary_crossentropy", batch_size=None, verbose=0, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True, seed=None):
         self.n_neurons = n_neurons

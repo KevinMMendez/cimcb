@@ -479,10 +479,10 @@ def roc_boot(Y,
         tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     # ROC up
-    # for i in range(len(tpr_ib.T)):
-    #     for j in range(1, len(tpr_ib)):
-    #         if tpr_ib[j, i] < tpr_ib[j - 1, i]:
-    #             tpr_ib[j, i] = tpr_ib[j - 1, i]
+    for i in range(len(tpr_ib.T)):
+        for j in range(1, len(tpr_ib)):
+            if tpr_ib[j, i] < tpr_ib[j - 1, i]:
+                tpr_ib[j, i] = tpr_ib[j - 1, i]
 
     # Get tpr mid
     if method != 'Per':
@@ -555,6 +555,7 @@ def roc_boot(Y,
     # if 'data' plot original data instead of median
     if plot == 'data':
       tpr_list_linspace = np.concatenate([[0], tpr_list])  # Add starting 0
+      tpr_list_linspace = np.concatenate([tpr_list_linspace,[1]])  # Add starting 0
       tpr_ib[:,2] = tpr_list_linspace
     elif plot == 'median':
       pass

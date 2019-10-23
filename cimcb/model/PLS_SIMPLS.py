@@ -37,7 +37,7 @@ class PLS_SIMPLS(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "metrics"]  # list of metrics to bootstrap
+    bootlist = ["model.vip_", "model.coef_", "model.x_loadings_", "model.x_scores_", "Y_pred", "model.pctvar_", "model.y_loadings_", "model.eval_metrics_"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2, pfi_metric="r2q2", pfi_nperm=0, pfi_mean=True):
         self.model = PLSRegression()  # Should change this to an empty model
@@ -107,13 +107,14 @@ class PLS_SIMPLS(BaseModel):
             self.model.pfi_auc_ = pfi_auc
 
         self.metrics_key = []
-        self.metrics = []
+        self.model.eval_metrics_ = []
         bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
-            self.metrics.append(value)
+            self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
 
-        self.metrics = np.array(self.metrics)
+        self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
+        #self.metrics = np.array(self.metrics)
 
         # Storing X, Y, and Y_pred
         self.X = X
@@ -146,13 +147,14 @@ class PLS_SIMPLS(BaseModel):
         self.Y_pred = y_pred_test
 
         if Y is not None:
-            self.metrics = []
+            self.metrics_key = []
+            self.model.eval_metrics_ = []
             bm = binary_evaluation(Y, y_pred_test)
             for key, value in bm.items():
-                self.metrics.append(value)
+                self.model.eval_metrics_.append(value)
+                self.metrics_key.append(key)
 
-        self.metrics = np.array(self.metrics)
-
+            self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
         return y_pred_test
 
     @staticmethod
