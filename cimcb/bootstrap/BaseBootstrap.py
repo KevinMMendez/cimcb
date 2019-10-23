@@ -175,10 +175,10 @@ class BaseBootstrap(ABC):
 
         return [bootstatloop, bootstatloop_oob]
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', testset=None, show_table=True):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', testset=None, show_table=True, trainset=None):
 
         test = testset
-
+        self.train = trainset
         if test is not None:
             bm = binary_evaluation(test[0], test[1])
             self.test = []
@@ -282,7 +282,7 @@ class BaseBootstrap(ABC):
             jackstat = None
             jackidx = None
 
-        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table)
+        roc_bokeh = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table, train=trainset)
 
         stats_table = pd.DataFrame(self.bootci['model.eval_metrics_'],
                                    columns=['IBLowCI', 'IBUppCI', 'IBMidCI'],
@@ -292,6 +292,13 @@ class BaseBootstrap(ABC):
         stats_table['OOBMidCI'] = np.percentile(np.array(self.bootstat_oob['model.eval_metrics_']), 50, axis=0)
 
         stats_table['Train'] = self.stat['model.eval_metrics_']
+
+        if self.train is not None:
+            st = binary_evaluation(self.train[0], self.train[1])
+            st2 = []
+            for key, value in st.items():
+                st2.append(value)
+            stats_table['Train'] = st2
 
         if self.test is not None:
             stats_table['Test'] = self.test
@@ -308,40 +315,62 @@ class BaseBootstrap(ABC):
         if show_table == False:
             fig = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
         else:
-            table = self.table
-            if plot_roc == 'data':
-                tabledata = dict(
-                    evaluate=[["Train IB"]],
-                    manw_pval=[["{}".format(table['Train'][2])]],
-                    auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
-                    R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
-                )
-            else:
-                tabledata = dict(
-                    evaluate=[["Train IB"]],
-                    manw_pval=[["{}".format(table['IBMidCI'][2])]],
-                    auc=[["{} ({}, {})".format(table['IBMidCI'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
-                    R2=[["{} ({}, {})".format(table['IBMidCI'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
-                )
-
-            # Append test data
-            tabledata["evaluate"].append(["Train OOB"])
-            tabledata["manw_pval"].append([table['OOBMidCI'][2]])
-            tabledata["auc"].append(["{} ({}, {})".format(table['OOBMidCI'][1], table['OOBLowCI'][1], table['OOBUppCI'][1])]),
-            tabledata["R2"].append(["{} ({}, {})".format(table['OOBMidCI'][0], table['OOBLowCI'][0], table['OOBUppCI'][0])]),
-
             if self.test is not None:
-                tabledata["evaluate"].append(["Test"])
-                tabledata["manw_pval"].append([table['Test'][2]])
-                tabledata["auc"].append(["{}".format(table['Test'][1])]),
-                tabledata["R2"].append(["{}".format(table['Test'][0])]),
-            columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC")]
+                if self.train is not None:
+                    table = self.table
+                    tabledata = dict(
+                        evaluate=[["Train (IB 95% CI)"]],
+                        manw_pval=[["{}".format(table['Train'][2])]],
+                        auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
+                        R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
+                    )
+                    # Append test data
+                    tabledata["evaluate"].append(["Test (OOB 95% CI)"])
+                    tabledata["manw_pval"].append([table['Test'][2]])
+                    tabledata["auc"].append(["{} ({}, {})".format(table['Test'][1], table['OOBLowCI'][1], table['OOBUppCI'][1])]),
+                    tabledata["R2"].append(["{} ({}, {})".format(table['Test'][0], table['OOBLowCI'][0], table['OOBUppCI'][0])]),
+                    columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R²"), TableColumn(field="auc", title="AUC")]
 
-            source = ColumnDataSource(data=tabledata)
-            if self.test is not None:
-                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=140), width=950, height=130)
+                    source = ColumnDataSource(data=tabledata)
+
+                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+
             else:
-                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+                table = self.table
+                if plot_roc == 'data':
+                    tabledata = dict(
+                        evaluate=[["Train (IB"]],
+                        manw_pval=[["{}".format(table['Train'][2])]],
+                        auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
+                        R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
+                    )
+                else:
+                    tabledata = dict(
+                        evaluate=[["Train IB"]],
+                        manw_pval=[["{}".format(table['IBMidCI'][2])]],
+                        auc=[["{} ({}, {})".format(table['IBMidCI'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
+                        R2=[["{} ({}, {})".format(table['IBMidCI'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
+                    )
+
+                # Append test data
+                tabledata["evaluate"].append(["Train OOB"])
+                tabledata["manw_pval"].append([table['OOBMidCI'][2]])
+                tabledata["auc"].append(["{} ({}, {})".format(table['OOBMidCI'][1], table['OOBLowCI'][1], table['OOBUppCI'][1])]),
+                tabledata["R2"].append(["{} ({}, {})".format(table['OOBMidCI'][0], table['OOBLowCI'][0], table['OOBUppCI'][0])]),
+
+                if self.test is not None:
+                    tabledata["evaluate"].append(["Test"])
+                    tabledata["manw_pval"].append([table['Test'][2]])
+                    tabledata["auc"].append(["{}".format(table['Test'][1])]),
+                    tabledata["R2"].append(["{}".format(table['Test'][0])]),
+                columns = [TableColumn(field="evaluate", title="Evaluate"), TableColumn(field="manw_pval", title="ManW P-Value"), TableColumn(field="R2", title="R2"), TableColumn(field="auc", title="AUC")]
+
+                source = ColumnDataSource(data=tabledata)
+
+                if self.test is not None:
+                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=140), width=950, height=130)
+                else:
+                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
             self.table = pd.DataFrame(tabledata)
             fig1 = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
             fig = layout(fig1, [table_bokeh])

@@ -38,7 +38,7 @@ from sklearn.utils import resample
 from ..utils import binary_evaluation
 
 
-def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_font_size="10pt", xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, method='BCA', plot='data', legend_basic=False):
+def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_font_size="10pt", xlabel="1 - Specificity", ylabel="Sensitivity", width=320, height=315, method='BCA', plot='data', legend_basic=False):
 
     # Set positive
     auc_check = roc_auc_score(Y, stat)
@@ -55,13 +55,16 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
     auc_stat = metrics.auc(fpr_stat, tpr_stat)
 
     # Drop intermediates when fpr = 0
-    tpr0_stat = tpr_stat[fpr_stat == 0][-1]
-    tpr_stat = np.concatenate([[tpr0_stat], tpr_stat[fpr_stat > 0]])
-    fpr_stat = np.concatenate([[0], fpr_stat[fpr_stat > 0]])
+    tpr_stat = interp(fpr_linspace, fpr_stat, tpr_stat)
+    tpr_list = tpr_stat
 
-    # Vertical averaging
-    idx = [np.abs(i - fpr_stat).argmin() for i in fpr_linspace]
-    tpr_list = np.array(tpr_stat[idx])
+    # tpr0_stat = tpr_stat[fpr_stat == 0][-1]
+    # tpr_stat = np.concatenate([[tpr0_stat], tpr_stat[fpr_stat > 0]])
+    # fpr_stat = np.concatenate([[0], fpr_stat[fpr_stat > 0]])
+
+    # # Vertical averaging
+    # idx = [np.abs(i - fpr_stat).argmin() for i in fpr_linspace]
+    # tpr_list = np.array(tpr_stat[idx])
 
     binary_stats_train_dict = binary_evaluation(Y, stat)
     binary_stats_train = []
@@ -154,10 +157,10 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       #stat_ib = np.array(stat_ib).T
       #print(stat_ib)
       # ROC up
-      for i in range(len(tpr_ib.T)):
-          for j in range(1, len(tpr_ib)):
-              if tpr_ib[j, i] < tpr_ib[j - 1, i]:
-                  tpr_ib[j, i] = tpr_ib[j - 1, i]
+      # for i in range(len(tpr_ib.T)):
+      #     for j in range(1, len(tpr_ib)):
+      #         if tpr_ib[j, i] < tpr_ib[j - 1, i]:
+      #             tpr_ib[j, i] = tpr_ib[j - 1, i]
 
       # Get tpr mid
       if method != 'Per':
@@ -172,6 +175,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       tpr_ib = np.array(tpr_ib)
       tpr_ib = tpr_ib.T
       tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+      tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
       binary_stats_train_dict = binary_evaluation(Y, stat)
       binary_stats_train = []
       for key, value in binary_stats_train_dict.items():
@@ -195,20 +199,28 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
       stat_ib.append(binary_stats_test)
 
       # Drop intermediates when fpr = 0
-      tpr0_test = tpr_test[fpr_test == 0][-1]
-      tpr_test = np.concatenate([[tpr0_test], tpr_test[fpr_test > 0]])
-      fpr_test = np.concatenate([[0], fpr_test[fpr_test > 0]])
-
-      # Vertical averaging
-      idx_test = [np.abs(i - fpr_test).argmin() for i in fpr_linspace]
-      tpr_test = tpr_test[idx_test]
+      tpr_test = interp(fpr_linspace, fpr_test, tpr_test)
       tpr_test = np.insert(tpr_test, 0, 0)  # Add starting 0
+      tpr_test = np.concatenate([tpr_test, [1]])
+
+
+      # Drop intermediates when fpr = 0
+      # tpr0_test = tpr_test[fpr_test == 0][-1]
+      # tpr_test = np.concatenate([[tpr0_test], tpr_test[fpr_test > 0]])
+      # fpr_test = np.concatenate([[0], fpr_test[fpr_test > 0]])
+
+      # # Vertical averaging
+      # idx_test = [np.abs(i - fpr_test).argmin() for i in fpr_linspace]
+      # tpr_test = tpr_test[idx_test]
+      # tpr_test = np.insert(tpr_test, 0, 0)  # Add starting 0
 
     fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
+    fpr_linspace  = np.concatenate((fpr_linspace, [1]))  # Add end 1
 
     # if 'data' plot original data instead of median
     if plot == 'data':
       tpr_list_linspace = np.concatenate([[0], tpr_list])  # Add starting 0
+      tpr_list_linspace = np.concatenate([tpr_list_linspace, [1]])  # Add starting 0
       tpr_ib[:, 2] = tpr_list_linspace
     elif plot == 'median':
       pass
@@ -261,7 +273,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
                               "y",
                               color="green",
                               line_width=2.5,
-                              alpha=0.8,
+                              alpha=0.7,
                               legend=legend_ib,
                               source=source_ib)
         fig.add_tools(HoverTool(renderers=[figline_ib],
@@ -288,7 +300,7 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
                               "y",
                               color="green",
                               line_width=2.5,
-                              alpha=0.8,
+                              alpha=0.7,
                               legend=legend_ib,
                               source=source_ib)
         fig.add_tools(HoverTool(renderers=[figline_ib],
@@ -311,12 +323,11 @@ def roc(Y, stat, test=None, bootnum=100, legend=True, grid_line=False, label_fon
 
       figline_test = fig.line("x",
                             "y",
-                            color="purple",
+                            color="orange",
                             line_width=2.5,
-                            alpha=0.8,
+                            alpha=0.7,
                             legend=legend_oob,
-                            source=source_test,
-                            line_dash="dashed")
+                            source=source_test)
       fig.add_tools(HoverTool(renderers=[figline_test],
                               tooltips=[("Specificity", "@spec{1.111}"),
                                           ("Sensitivity", "@y{1.111}"), ]))
@@ -379,7 +390,7 @@ def roc_boot(Y,
              smoothval=0,
              jackstat=None,
              jackidx=None,
-             xlabel="1-Specificity",
+             xlabel="1 - Specificity",
              ylabel="Sensitivity",
              width=320,
              height=315,
@@ -389,7 +400,8 @@ def roc_boot(Y,
              plot_num=0,
              plot='data',
              test=None,
-             legend_basic=False):
+             legend_basic=False,
+             train=None):
 
     # Set positive
     auc_check = roc_auc_score(Y, stat)
@@ -404,15 +416,6 @@ def roc_boot(Y,
     # Calculate for STAT
     fpr_stat, tpr_stat, _ = metrics.roc_curve(Y, stat, pos_label=pos, drop_intermediate=False)
     auc_stat = metrics.auc(fpr_stat, tpr_stat)
-
-    # Drop intermediates when fpr = 0
-    # tpr0_stat = tpr_stat[fpr_stat == 0][-1]
-    # tpr_stat = np.concatenate([[tpr0_stat], tpr_stat[fpr_stat > 0]])
-    # fpr_stat = np.concatenate([[0], fpr_stat[fpr_stat > 0]])
-
-    # # Vertical averaging
-    # idx = [np.abs(i - fpr_stat).argmin() for i in fpr_linspace]
-    # tpr_list = np.array(tpr_stat[idx])
     tpr_stat = interp(fpr_linspace, fpr_stat, tpr_stat)
     tpr_list = tpr_stat
 
@@ -425,11 +428,11 @@ def roc_boot(Y,
         Ytrue_boot = Y[bootidx[i]]
         fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=pos, drop_intermediate=False)
         auc_boot = metrics.auc(fpr_boot, tpr_boot)
-        if auc_boot > 0.5:
-            pos_loop.append(pos)
-        else:
-          fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
-          pos_loop.append(abs(1 - pos))
+        # if auc_boot > 0.5:
+        #     pos_loop.append(pos)
+        # else:
+        #   fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
+        #   pos_loop.append(abs(1 - pos))
 
         # Drop intermediates when fpr = 0
         # tpr0_boot = tpr_boot[fpr_boot == 0][-1]
@@ -451,8 +454,8 @@ def roc_boot(Y,
             Ytrue_jack = Y[jackidx[i]]
             fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=pos, drop_intermediate=False)
             auc_jack = metrics.auc(fpr_jack, tpr_jack)
-            if auc_jack < 0.5:
-                fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=abs(1 - pos), drop_intermediate=False)
+            # if auc_jack < 0.5:
+            #     fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=abs(1 - pos), drop_intermediate=False)
 
             # Drop intermediates when fpr = 0
             tpr0_jack = tpr_jack[fpr_jack == 0][-1]
@@ -479,10 +482,11 @@ def roc_boot(Y,
         tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     # ROC up
-    for i in range(len(tpr_ib.T)):
-        for j in range(1, len(tpr_ib)):
-            if tpr_ib[j, i] < tpr_ib[j - 1, i]:
-                tpr_ib[j, i] = tpr_ib[j - 1, i]
+    if method != 'Per':
+      for i in range(len(tpr_ib.T)):
+          for j in range(1, len(tpr_ib)):
+              if tpr_ib[j, i] < tpr_ib[j - 1, i]:
+                  tpr_ib[j, i] = tpr_ib[j - 1, i]
 
     # Get tpr mid
     if method != 'Per':
@@ -497,8 +501,8 @@ def roc_boot(Y,
         Ytrue_boot_oob = Y[bootidx_oob[i]]
         fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=pos, drop_intermediate=False)
         auc_boot_oob = metrics.auc(fpr_boot_oob, tpr_boot_oob)
-        if auc_boot_oob < 0.5:
-          fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=abs(1-pos_loop[i]), drop_intermediate=False)
+        # if auc_boot_oob < 0.5:
+        #   fpr_boot_oob, tpr_boot_oob, _ = metrics.roc_curve(Ytrue_boot_oob, Yscore_boot_oob, pos_label=abs(1-pos_loop[i]), drop_intermediate=False)
         auc_boot_oob = metrics.auc(fpr_boot_oob, tpr_boot_oob)
         auc_bootstat_oob.append(auc_boot_oob)
 
@@ -525,10 +529,11 @@ def roc_boot(Y,
     tpr_oob = np.concatenate((tpr_oob, np.ones((1, 3))), axis=0)  # Add end 1
 
     # ROC up
-    for i in range(len(tpr_oob.T)):
-        for j in range(1, len(tpr_oob)):
-            if tpr_oob[j, i] < tpr_oob[j - 1, i]:
-                tpr_oob[j, i] = tpr_oob[j - 1, i]
+    if method != 'Per':
+      for i in range(len(tpr_oob.T)):
+          for j in range(1, len(tpr_oob)):
+              if tpr_oob[j, i] < tpr_oob[j - 1, i]:
+                  tpr_oob[j, i] = tpr_oob[j - 1, i]
 
     # Test if available
     if test is not None:
@@ -538,21 +543,24 @@ def roc_boot(Y,
       auc_test = metrics.auc(fpr_test, tpr_test)
 
       # Drop intermediates when fpr = 0
-      tpr0_test= tpr_test[fpr_test == 0][-1]
-      tpr_test = np.concatenate([[tpr0_test], tpr_test[fpr_test > 0]])
-      fpr_test = np.concatenate([[0], fpr_test[fpr_test > 0]])
+      # tpr0_test= tpr_test[fpr_test == 0][-1]
+      # tpr_test = np.concatenate([[tpr0_test], tpr_test[fpr_test > 0]])
+      # fpr_test = np.concatenate([[0], fpr_test[fpr_test > 0]])
 
-      # Vertical averaging
-      idx_test = [np.abs(i - fpr_test).argmin() for i in fpr_linspace]
-      tpr_test = tpr_test[idx_test]
+      # # Vertical averaging
+      # idx_test = [np.abs(i - fpr_test).argmin() for i in fpr_linspace]
+      # tpr_test = tpr_test[idx_test]
+
+      tpr_test = interp(fpr_linspace, fpr_test, tpr_test)
       tpr_test = np.insert(tpr_test, 0, 0) # Add starting 0
       tpr_test = np.concatenate((tpr_test,[1]))
-
-
-    fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
-    fpr_linspace  = np.concatenate((fpr_linspace, [1]))  # Add end 1
+      tpr_oob[:, 2] = tpr_test
 
     # if 'data' plot original data instead of median
+    if train is not None:
+      fpr_stat, tpr_stat, _ = metrics.roc_curve(train[0], train[1], pos_label=pos, drop_intermediate=False)
+      tpr_stat = interp(fpr_linspace, fpr_stat, tpr_stat)
+      tpr_list = tpr_stat
     if plot == 'data':
       tpr_list_linspace = np.concatenate([[0], tpr_list])  # Add starting 0
       tpr_list_linspace = np.concatenate([tpr_list_linspace,[1]])  # Add starting 0
@@ -562,12 +570,18 @@ def roc_boot(Y,
     else:
       raise ValueError("plot must be 'data' or 'median'")
 
+
+    fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
+    fpr_linspace  = np.concatenate((fpr_linspace, [1]))  # Add end 1
+
+
     # Check upper limit / lower limit
-    for i in tpr_ib:
-      if i[0] > i[2]:
-        i[0] = i[2]
-      if i[1] < i[2]:
-        i[1] = i[2]
+    if method != 'Per':
+      for i in tpr_ib:
+        if i[0] > i[2]:
+          i[0] = i[2]
+        if i[1] < i[2]:
+          i[1] = i[2]
 
     # Calculate AUC
     auc_ib_low = metrics.auc(fpr_linspace, tpr_ib[:, 0])
@@ -619,7 +633,7 @@ def roc_boot(Y,
     if plot_num in [0, 1, 2, 4]:
 
         if legend_basic == True:
-          legend_text = "Train IB"
+          legend_text = "Train"
         else:
           legend_text = "IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0]) / 2)
 
@@ -627,7 +641,7 @@ def roc_boot(Y,
                               "y",
                               color="green",
                               line_width=2.5,
-                              alpha=0.8,
+                              alpha=0.7,
                               legend=legend_text,
                               source=source_ib)
         fig.add_tools(HoverTool(renderers=[figline_ib],
@@ -645,6 +659,8 @@ def roc_boot(Y,
                           source=source_ib)
         fig.add_layout(figband_ib)
 
+        figlegend_ib = fig.rect([10],[20],[5],[5], color="green", fill_alpha=0.1, line_width=0.5, line_color="grey", legend="IB (95% CI)")
+
     # Plot OOB
     data_oob = {"x": fpr_linspace,
                 "y": tpr_oob[:, 2],
@@ -658,7 +674,7 @@ def roc_boot(Y,
     if plot_num in [0, 1, 3, 4]:
 
         if legend_basic == True:
-          legend_text = "Train OOB"
+          legend_text = "Test"
         else:
           legend_text = "OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob[2], (auc_oob[1] - auc_oob[0]) / 2)
 
@@ -666,7 +682,7 @@ def roc_boot(Y,
                            "y",
                            color="orange",
                            line_width=2.5,
-                           alpha=0.8,
+                           alpha=0.7,
                            legend=legend_text,
                            source=source_oob)
         fig.add_tools(HoverTool(renderers=[figline],
@@ -685,31 +701,33 @@ def roc_boot(Y,
                            source=source_oob)
         fig.add_layout(figband_oob)
 
+        figlegend_ib = fig.rect([10],[20],[5],[5], color="orange", fill_alpha=0.1, line_width=0.5, line_color="grey", legend="OOB (95% CI)")
+
     # Line Test
-    if test is not None:
+    # if test is not None:
 
-      if legend_basic == True:
-        legend_text = "Test"
-      else:
-        legend_text = "Test (AUC = {:.2f})".format(auc_test)
-      # Plot IB
-      data_test = {"x": fpr_linspace,
-                 "y": tpr_test,
-                 "spec": spec}
-      source_test = ColumnDataSource(data=data_test)
+    #   if legend_basic == True:
+    #     legend_text = "Test"
+    #   else:
+    #     legend_text = "Test (AUC = {:.2f})".format(auc_test)
+    #   # Plot IB
+    #   data_test = {"x": fpr_linspace,
+    #              "y": tpr_test,
+    #              "spec": spec}
+    #   source_test = ColumnDataSource(data=data_test)
 
 
-      figline_test = fig.line("x",
-                            "y",
-                            color="purple",
-                            line_width=2.5,
-                            alpha=0.8,
-                            legend=legend_text,
-                            line_dash="dashed",
-                            source=source_test)
-      fig.add_tools(HoverTool(renderers=[figline_test],
-                              tooltips=[("Specificity", "@spec{1.111}"),
-                                          ("Sensitivity", "@y{1.111}"), ]))
+    #   figline_test = fig.line("x",
+    #                         "y",
+    #                         color="purple",
+    #                         line_width=2.5,
+    #                         alpha=0.8,
+    #                         legend=legend_text,
+    #                         line_dash="dashed",
+    #                         source=source_test)
+    #   fig.add_tools(HoverTool(renderers=[figline_test],
+    #                           tooltips=[("Specificity", "@spec{1.111}"),
+    #                                       ("Sensitivity", "@y{1.111}"), ]))
 
     if grid_line == False:
         fig.xgrid.visible = False

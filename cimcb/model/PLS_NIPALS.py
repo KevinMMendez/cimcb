@@ -140,10 +140,10 @@ class PLS_NIPALS(BaseModel):
         self.Y = Y  # Y vs. Y_true
 
         self.metrics_key = []
-        self.model.metrics = []
+        self.model.eval_metrics_ = []
         bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
-            self.model.metrics.append(value)
+            self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
 
         return y_pred_train
@@ -172,9 +172,12 @@ class PLS_NIPALS(BaseModel):
         self.Y_pred = y_pred_test
 
         if Y is not None:
-            self.metrics = []
+            self.metrics_key = []
+            self.model.eval_metrics_ = []
             bm = binary_evaluation(Y, y_pred_test)
             for key, value in bm.items():
-                self.metrics.append(value)
+                self.model.eval_metrics_.append(value)
+                self.metrics_key.append(key)
 
+            self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
         return y_pred_test

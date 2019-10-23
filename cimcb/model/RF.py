@@ -12,7 +12,7 @@ class RF(BaseModel):
     parametric = True
     bootlist = None  # list of metrics to bootstrap
 
-    bootlist = ["Y_pred", "metrics"]  # list of metrics to bootstrap
+    bootlist = ["Y_pred", "model.eval_metrics_"]  # list of metrics to bootstrap
 
     def __init__(self, n_estimators=100, max_features="auto", max_depth=None, criterion="gini", min_samples_split=2, min_samples_leaf=1, max_leaf_nodes=None, n_jobs=None):
         self.model = RandomForestClassifier(n_estimators=n_estimators, max_features=max_features, max_depth=max_depth, criterion=criterion, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, max_leaf_nodes=max_leaf_nodes, n_jobs=n_jobs)
@@ -66,11 +66,13 @@ class RF(BaseModel):
         self.Y_pred = y_pred_train
 
         self.metrics_key = []
-        self.metrics = []
+        self.model.eval_metrics_ = []
         bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
-            self.metrics.append(value)
+            self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
+
+        self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
 
         return y_pred_train
 
@@ -96,9 +98,12 @@ class RF(BaseModel):
         y_pred_test = np.array(self.model.predict_proba(X)[:, self.pred_index])
 
         if Y is not None:
-            self.metrics = []
+            self.metrics_key = []
+            self.model.eval_metrics_ = []
             bm = binary_evaluation(Y, y_pred_test)
             for key, value in bm.items():
-                self.metrics.append(value)
+                self.model.eval_metrics_.append(value)
+                self.metrics_key.append(key)
 
+            self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
         return y_pred_test

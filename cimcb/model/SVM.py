@@ -12,7 +12,7 @@ class SVM(BaseModel):
     parametric = True
     bootlist = None  # list of metrics to bootstrap
 
-    bootlist = ["Y_pred", "metrics"]  # list of metrics to bootstrap
+    bootlist = ["Y_pred", "model.eval_metrics_"]  # list of metrics to bootstrap
 
     def __init__(self, C=1.0, kernel="rbf", degree=3, gamma="auto", tol=0.001, max_iter=-1):
         self.model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, probability=True, tol=tol, max_iter=max_iter)
@@ -65,11 +65,13 @@ class SVM(BaseModel):
         self.Y = Y
         self.Y_pred = y_pred_train
         self.metrics_key = []
-        self.metrics = []
+        self.model.eval_metrics_ = []
         bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
-            self.metrics.append(value)
+            self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
+
+        self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
 
         return y_pred_train
 
@@ -94,9 +96,12 @@ class SVM(BaseModel):
         # Calculate and return Y predicted value
         y_pred_test = np.array(self.model.predict_proba(X)[:, self.pred_index])
         if Y is not None:
-            self.metrics = []
+            self.metrics_key = []
+            self.model.eval_metrics_ = []
             bm = binary_evaluation(Y, y_pred_test)
             for key, value in bm.items():
-                self.metrics.append(value)
+                self.model.eval_metrics_.append(value)
+                self.metrics_key.append(key)
 
+            self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
         return y_pred_test
