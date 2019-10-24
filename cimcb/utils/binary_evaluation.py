@@ -49,6 +49,10 @@ def binary_evaluation(y_true, y_pred):
     fpr, tpr, thresholds = metrics.roc_curve(y_true_arr, y_pred_arr, pos_label=1)
     stats["AUC"] = metrics.auc(fpr, tpr)
 
-    stats["ManW P-Value"] = scipy.stats.mannwhitneyu(y_pred_arr[y_true_arr == 0], y_pred_arr[y_true_arr == 1], alternative="two-sided")[1]
+    try:
+        stats["ManW P-Value"] = scipy.stats.mannwhitneyu(y_pred_arr[y_true_arr == 0], y_pred_arr[y_true_arr == 1], alternative="two-sided")[1]
+    except ValueError:
+        print('yo')
+        stats["ManW P-Value"] = 1
 
     return stats

@@ -328,7 +328,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='ratio', alt=True, grid_line=False):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='standard', alt=True, grid_line=False):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -356,6 +356,12 @@ class BaseCrossVal(ABC):
 
     def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend=True, ci=95, method='ratio', style=0, alt=True, grid_line=False):
         """Used for plot function if the number of parameters is 1."""
+
+        size_a = 13
+        size_b = 10
+        if len(self.param_list) > 14:
+            size_a = size_a - 2
+            size_b = size_b - 2
 
         # Get ci
         if self.n_mc > 1:
@@ -473,7 +479,7 @@ class BaseCrossVal(ABC):
         fig1_line = fig1.line(cv, diff, line_width=3, line_color="black", line_alpha=0.25)
 
         # Figure 1: Add circles (interactive click)
-        fig1_circ = fig1.circle("cv", "diff", size=13, alpha=0.7, color="green", source=source)
+        fig1_circ = fig1.circle("cv", "diff", size=size_a, alpha=0.7, color="green", source=source)
         fig1_circ.selection_glyph = Circle(fill_color="green", line_width=2, line_color="black")
         fig1_circ.nonselection_glyph.fill_color = "green"
         fig1_circ.nonselection_glyph.fill_alpha = 0.4
@@ -565,7 +571,7 @@ class BaseCrossVal(ABC):
 
             # Figure 2: add full
             fig2_line_full = fig2.line(values_string, full, line_color="green", line_width=3, legend=full_legend)
-            fig2_circ_full = fig2.circle("values_string", "full", line_color="green", fill_color="white", fill_alpha=1, size=10, source=source)
+            fig2_circ_full = fig2.circle("values_string", "full", line_color="green", fill_color="white", fill_alpha=1, size=size_b, source=source)
             fig2_circ_full.selection_glyph = Circle(line_color="green", fill_color="white", line_width=2)
             fig2_circ_full.nonselection_glyph.line_color = "green"
             fig2_circ_full.nonselection_glyph.fill_color = "white"
@@ -573,7 +579,7 @@ class BaseCrossVal(ABC):
 
             # Figure 2: add cv
             fig2_line_cv = fig2.line(values_string, cv, line_color="green", line_width=3, line_dash='dashed', legend=cv_legend)
-            fig2_circ_cv = fig2.circle("values_string", "cv", line_color="green", fill_color="white", fill_alpha=1, size=10, source=source)
+            fig2_circ_cv = fig2.circle("values_string", "cv", line_color="green", fill_color="white", fill_alpha=1, size=size_b, source=source)
             fig2_circ_cv.selection_glyph = Circle(line_color="green", fill_color="white", line_width=2)
             fig2_circ_cv.nonselection_glyph.line_color = "green"
             fig2_circ_cv.nonselection_glyph.fill_color = "white"

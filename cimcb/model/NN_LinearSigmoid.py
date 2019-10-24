@@ -149,6 +149,9 @@ class NN_LinearSigmoid(BaseModel):
             self.model.pfi_r2q2_ = pfi_r2q2
             self.model.pfi_auc_ = pfi_auc
 
+        self.Y_train = Y
+        self.Y_pred_train = y_pred_train
+
         self.Y_pred = y_pred_train
         self.X = X
         self.Y = Y

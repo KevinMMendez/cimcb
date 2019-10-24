@@ -60,6 +60,10 @@ class RF(BaseModel):
         # Calculate and return Y prediction value
         y_pred_train = np.array(self.model.predict_proba(X)[:, self.pred_index])
 
+        self.model.y_loadings_ = np.array([0, 0, 0])
+        self.model.x_scores_ = np.array([0, 0, 0])
+        self.model.pctvar_ = np.array([0, 0, 0])
+
         # Storing X, Y, and Y_pred
         self.X = X
         self.Y = Y
@@ -71,6 +75,9 @@ class RF(BaseModel):
         for key, value in bm.items():
             self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
+
+        self.Y_train = Y
+        self.Y_pred_train = y_pred_train
 
         self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
 
@@ -106,4 +113,6 @@ class RF(BaseModel):
                 self.metrics_key.append(key)
 
             self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
+
+        self.Y_pred = y_pred_test
         return y_pred_test

@@ -30,7 +30,7 @@ class PCLR(BaseModel):
     """
 
     parametric = True
-    bootlist = ["model.coef_", "Y_pred", "metrics"]  # list of metrics to bootstrap
+    bootlist = ["model.coef_", "Y_pred", "model.eval_metrics_"]  # list of metrics to bootstrap
 
     def __init__(self, n_components=2):
         self.model = PCA(n_components=n_components)
@@ -78,16 +78,19 @@ class PCLR(BaseModel):
         # Calculate and return Y prediction value
         y_pred_train = self.regrmodel.predict(self.model.x_scores_).flatten()
 
-        # Storing X, Y, and Y_pred
+        self.Y_train = Y
+        self.Y_pred_train = y_pred_train
+        self.Y_pred = y_pred_train
         self.X = X
         self.Y = Y
-        self.Y_pred = y_pred_train
         self.metrics_key = []
-        self.metrics = []
+        self.model.eval_metrics_ = []
         bm = binary_evaluation(Y, y_pred_train)
         for key, value in bm.items():
-            self.metrics.append(value)
+            self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
+
+        self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
 
         return y_pred_train
 
@@ -114,9 +117,14 @@ class PCLR(BaseModel):
         y_pred_test = self.regrmodel.predict(newX).flatten()
         # Calculate and return Y predicted value
         if Y is not None:
-            self.metrics = []
+            self.metrics_key = []
+            self.model.eval_metrics_ = []
             bm = binary_evaluation(Y, y_pred_test)
             for key, value in bm.items():
-                self.metrics.append(value)
+                self.model.eval_metrics_.append(value)
+                self.metrics_key.append(key)
 
+            self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
+
+        self.Y_pred = y_pred_test
         return y_pred_test

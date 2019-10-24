@@ -61,6 +61,10 @@ class Per(BaseBootstrap):
     @staticmethod
     def bootci_method(bootstat, stat):
         """Calculates bootstrap confidence intervals using the percentile bootstrap interval."""
+        try:
+            stat.ndim
+        except AttributeError:
+            print(stat)
         if stat.ndim == 1:
             boot_ci = []
             # Calculate bootci for each component (peak), and append it to bootci

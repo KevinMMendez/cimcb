@@ -113,6 +113,9 @@ class PLS_SIMPLS(BaseModel):
             self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
 
+        self.Y_train = Y
+        self.Y_pred_train = y_pred_train
+
         self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
         #self.metrics = np.array(self.metrics)
 

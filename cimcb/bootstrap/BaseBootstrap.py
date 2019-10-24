@@ -124,20 +124,23 @@ class BaseBootstrap(ABC):
                 self.bootstat_oob[key].append(value[0])
 
         # Check if loadings flip
-        orig = self.stat['model.x_loadings_']
-        for i in range(len(self.bootstat['model.x_loadings_'])):
-            check = self.bootstat['model.x_loadings_'][i]
-            for j in range(len(orig.T)):
-                corr = np.corrcoef(orig[:, j], check[:, j])[1, 0]
-                if corr < 0:
-                    for key, value in self.bootstat.items():
-                        if key == 'model.x_loadings_':
-                            value[i][:, j] = - value[i][:, j]
-                            self.bootstat[key] = value
-                    for key, value in self.bootstat.items():
-                        if key == 'model.x_scores_':
-                            value[i][:, j] = - value[i][:, j]
-                            self.bootstat[key] = value
+        try:
+            orig = self.stat['model.x_loadings_']
+            for i in range(len(self.bootstat['model.x_loadings_'])):
+                check = self.bootstat['model.x_loadings_'][i]
+                for j in range(len(orig.T)):
+                    corr = np.corrcoef(orig[:, j], check[:, j])[1, 0]
+                    if corr < 0:
+                        for key, value in self.bootstat.items():
+                            if key == 'model.x_loadings_':
+                                value[i][:, j] = - value[i][:, j]
+                                self.bootstat[key] = value
+                        for key, value in self.bootstat.items():
+                            if key == 'model.x_scores_':
+                                value[i][:, j] = - value[i][:, j]
+                                self.bootstat[key] = value
+        except KeyError:
+            pass
 
         # Stop timer
         stop = timeit.default_timer()
@@ -333,7 +336,7 @@ class BaseBootstrap(ABC):
 
                     source = ColumnDataSource(data=tabledata)
 
-                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=95)
 
             else:
                 table = self.table
@@ -368,9 +371,9 @@ class BaseBootstrap(ABC):
                 source = ColumnDataSource(data=tabledata)
 
                 if self.test is not None:
-                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=140), width=950, height=130)
+                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=140), width=950, height=140)
                 else:
-                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+                    table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=90)
             self.table = pd.DataFrame(tabledata)
             fig1 = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
             fig = layout(fig1, [table_bokeh])

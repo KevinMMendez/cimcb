@@ -258,9 +258,9 @@ class BaseModel(ABC):
             The number of bootstrap samples used in the computation.
         """
         test = testset
-        self.train(self.X, self.Y)
-        Ytrue_train = self.Y
-        Yscore_train = self.Y_pred.flatten()
+        #self.train(self.X, self.Y)
+        Ytrue_train = self.Y_train
+        Yscore_train = self.Y_pred_train.flatten()
 
         # Get Ytrue_test, Yscore_test from testset
         if test is not None:
@@ -370,9 +370,9 @@ class BaseModel(ABC):
 
             source = ColumnDataSource(data=tabledata)
             if self.test is not None:
-                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=95)
             else:
-                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=80)
+                table_bokeh = widgetbox(DataTable(source=source, columns=columns, width=950, height=90), width=950, height=95)
 
             fig1 = gridplot([[violin_bokeh, dist_bokeh, roc_bokeh]])
             fig = layout(fig1, [table_bokeh])
