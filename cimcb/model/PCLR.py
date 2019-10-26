@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 from .BaseModel import BaseModel
+from sklearn.metrics import roc_auc_score
 from ..utils import binary_metrics, binary_evaluation
 
 
@@ -76,7 +77,19 @@ class PCLR(BaseModel):
         self.model.y_loadings_ = self.regrmodel.coef_.reshape(1, len(self.regrmodel.coef_.flatten()))
 
         # Calculate and return Y prediction value
-        y_pred_train = self.regrmodel.predict(self.model.x_scores_).flatten()
+        #y_pred_train = self.regrmodel.predict(self.model.x_scores_).flatten()
+        # Predict_proba was designed for multi-groups...
+        # This makes it sure that y_pred is correct
+        y_pred = self.regrmodel.predict_proba(self.model.x_scores_)
+        pred_0 = roc_auc_score(Y, y_pred[:, 0])
+        pred_1 = roc_auc_score(Y, y_pred[:, 1])
+        if pred_0 > pred_1:
+            self.pred_index = 0
+        else:
+            self.pred_index = 1
+
+        # Calculate and return Y prediction value
+        y_pred_train = np.array(self.regrmodel.predict_log_proba(self.model.x_scores_)[:, self.pred_index])
 
         self.Y_train = Y
         self.Y_pred_train = y_pred_train
@@ -114,7 +127,10 @@ class PCLR(BaseModel):
 
         # Calculate and return Y predicted value
         newX = self.model.transform(X)
-        y_pred_test = self.regrmodel.predict(newX).flatten()
+        #y_pred_test = self.regrmodel.predict(newX).flatten()
+        # Calculate and return Y predicted value
+        y_pred_test = np.array(self.regrmodel.predict_log_proba(newX)[:, self.pred_index])
+
         # Calculate and return Y predicted value
         if Y is not None:
             self.metrics_key = []
