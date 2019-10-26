@@ -593,6 +593,8 @@ def roc_boot(Y,
     auc_oob_mid = metrics.auc(fpr_linspace, tpr_oob[:, 2])
     auc_oob = np.array([auc_oob_low, auc_oob_upp, auc_oob_mid])
 
+    # print(auc_ib)
+    # print(auc_oob)
     # print("AUC IB {} ({},{})".format(auc_ib[2], auc_ib[0], auc_ib[1]))
     # print("AUC OOB {} ({},{})".format(auc_oob[2], auc_oob[0], auc_oob[1]))
 
@@ -1163,8 +1165,10 @@ def roc_boot(Y,
                     fig.legend.location = "bottom_right"
                     fig.legend.visible = True
 
-
-    return fig
+    if train is None:
+      return fig, auc_ib, auc_oob
+    else:
+      return fig, auc_ib, auc_oob
 
 
 def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specificity", ylabel="Sensitivity", legend=True, label_font_size="13pt", show_title=True, title_font_size="13pt", title="", plot_num=0, grid_line=False):
