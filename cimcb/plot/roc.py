@@ -401,7 +401,8 @@ def roc_boot(Y,
              plot='data',
              test=None,
              legend_basic=False,
-             train=None):
+             train=None,
+             ci_only=False):
 
     # Set positive
     auc_check = roc_auc_score(Y, stat)
@@ -568,7 +569,9 @@ def roc_boot(Y,
     elif plot == 'median':
       pass
     else:
-      raise ValueError("plot must be 'data' or 'median'")
+      pass
+    # else:
+    #   raise ValueError("plot must be 'data' or 'median'")
 
 
     fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
@@ -639,16 +642,17 @@ def roc_boot(Y,
         else:
           legend_text = "IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0]) / 2)
 
-        figline_ib = fig.line("x",
-                              "y",
-                              color="green",
-                              line_width=2.5,
-                              alpha=0.7,
-                              legend=legend_text,
-                              source=source_ib)
-        fig.add_tools(HoverTool(renderers=[figline_ib],
-                                tooltips=[("Specificity", "@spec{1.111}"),
-                                          ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ]))
+        if ci_only == False:
+          figline_ib = fig.line("x",
+                                "y",
+                                color="green",
+                                line_width=2.5,
+                                alpha=0.7,
+                                legend=legend_text,
+                                source=source_ib)
+          fig.add_tools(HoverTool(renderers=[figline_ib],
+                                  tooltips=[("Specificity", "@spec{1.111}"),
+                                            ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ]))
         # CI Band IB
         figband_ib = Band(base="x",
                           lower="lowci",
@@ -680,16 +684,17 @@ def roc_boot(Y,
         else:
           legend_text = "OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob[2], (auc_oob[1] - auc_oob[0]) / 2)
 
-        figline = fig.line("x",
-                           "y",
-                           color="orange",
-                           line_width=2.5,
-                           alpha=0.7,
-                           legend=legend_text,
-                           source=source_oob)
-        fig.add_tools(HoverTool(renderers=[figline],
-                                tooltips=[("Specificity", "@spec{1.111}"),
-                                          ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ]))
+        if ci_only == False:
+          figline = fig.line("x",
+                             "y",
+                             color="orange",
+                             line_width=2.5,
+                             alpha=0.7,
+                             legend=legend_text,
+                             source=source_oob)
+          fig.add_tools(HoverTool(renderers=[figline],
+                                  tooltips=[("Specificity", "@spec{1.111}"),
+                                            ("Sensitivity", "@y{1.111} (+/- @ci{1.111})"), ]))
 
         # CI Band OOB
         figband_oob = Band(base="x",
