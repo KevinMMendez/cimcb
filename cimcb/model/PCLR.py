@@ -89,7 +89,7 @@ class PCLR(BaseModel):
             self.pred_index = 1
 
         # Calculate and return Y prediction value
-        y_pred_train = np.array(self.regrmodel.predict_log_proba(self.model.x_scores_)[:, self.pred_index])
+        y_pred_train = np.array(self.regrmodel.predict_proba(self.model.x_scores_)[:, self.pred_index])
 
         self.Y_train = Y
         self.Y_pred_train = y_pred_train
@@ -129,7 +129,7 @@ class PCLR(BaseModel):
         newX = self.model.transform(X)
         #y_pred_test = self.regrmodel.predict(newX).flatten()
         # Calculate and return Y predicted value
-        y_pred_test = np.array(self.regrmodel.predict_log_proba(newX)[:, self.pred_index])
+        y_pred_test = np.array(self.regrmodel.predict_proba(newX)[:, self.pred_index])
 
         # Calculate and return Y predicted value
         if Y is not None:
