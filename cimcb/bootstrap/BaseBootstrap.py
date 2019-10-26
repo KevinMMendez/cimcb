@@ -188,6 +188,10 @@ class BaseBootstrap(ABC):
             for key, value in bm.items():
                 self.test.append(value)
 
+        if plot_roc == 'ci':
+            ci_only = True
+        else:
+            ci_only = False
         legend_violin = False
         legend_dist = False
         legend_roc = False
@@ -285,7 +289,7 @@ class BaseBootstrap(ABC):
             jackstat = None
             jackidx = None
 
-        roc_bokeh, auc_ib, auc_oob = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table, train=trainset)
+        roc_bokeh, auc_ib, auc_oob = roc_boot(self.Y, self.stat['Y_pred'], self.bootstat['Y_pred'], self.bootstat_oob['Y_pred'], self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity", ylabel="Sensitivity", width=320, height=315, label_font_size="10pt", legend=legend_roc, grid_line=grid_line, plot_num=0, plot=plot_roc, test=test, legend_basic=show_table, train=trainset, ci_only=ci_only)
 
         stats_table = pd.DataFrame(self.bootci['model.eval_metrics_'],
                                    columns=['IBLowCI', 'IBUppCI', 'IBMidCI'],
