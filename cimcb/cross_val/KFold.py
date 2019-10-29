@@ -60,7 +60,7 @@ class KFold(BaseCrossVal):
         # FULL
         try:
             full = Parallel(n_jobs=self.n_cores)(delayed(self._calc_full_loop)(i) for i in tqdm(range(len(self.param_list)), desc="1/2"))
-        except TerminatedWorkerError:
+        except:
             print("TerminatedWorkerError was raised due to excessive memory usage. n_cores was reduced to 1.")
             full = Parallel(n_jobs=1)(delayed(self._calc_full_loop)(i) for i in tqdm(range(len(self.param_list)), desc="1/2"))
         self.ypred_full = []
@@ -84,7 +84,7 @@ class KFold(BaseCrossVal):
         self.loop_mc = self.param_list * self.n_mc
         try:
             ypred = Parallel(n_jobs=self.n_cores)(delayed(self._calc_cv_loop)(i) for i in tqdm(range(len(self.loop_mc)), desc="2/2"))
-        except TerminatedWorkerError:
+        except:
             print("TerminatedWorkerError was raised due to excessive memory usage. n_cores was reduced to 1.")
             ypred = Parallel(n_jobs=1)(delayed(self._calc_cv_loop)(i) for i in tqdm(range(len(self.loop_mc)), desc="2/2"))
 
