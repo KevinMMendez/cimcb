@@ -63,9 +63,9 @@ class BCA(BaseBootstrap):
             self.jackstat[i] = []
         try:
             stats_loop = Parallel(n_jobs=self.n_cores)(delayed(self._calc_jackstat_loop)(i) for i in tqdm(range(len(self.jackidx)), desc="2/2"))
-        except TerminatedWorkerError:
+        except:
             print("TerminatedWorkerError was raised due to excessive memory usage. n_cores was reduced to 1.")
-            tats_loop = Parallel(n_jobs=1)(delayed(self._calc_jackstat_loop)(i) for i in tqdm(range(len(self.jackidx)), desc="2/2"))
+            stats_loop = Parallel(n_jobs=1)(delayed(self._calc_jackstat_loop)(i) for i in tqdm(range(len(self.jackidx)), desc="2/2"))
             
         self.jackstat_test = stats_loop
         for i in stats_loop:
@@ -111,7 +111,7 @@ class BCA(BaseBootstrap):
         # Calculate bootstat for each bootstrap resample
         try:
             stats_loop = Parallel(n_jobs=self.n_cores)(delayed(self._calc_bootstat_loop)(i) for i in tqdm(range(self.bootnum), desc="1/2"))
-        except TerminatedWorkerError:
+        except:
             print("TerminatedWorkerError was raised due to excessive memory usage. n_cores was reduced to 1.")
             stats_loop = Parallel(n_jobs=1)(delayed(self._calc_bootstat_loop)(i) for i in tqdm(range(self.bootnum), desc="1/2"))
             
