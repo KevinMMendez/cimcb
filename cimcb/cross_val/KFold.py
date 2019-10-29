@@ -58,7 +58,11 @@ class KFold(BaseCrossVal):
         start = timeit.default_timer()
 
         # FULL
-        full = Parallel(n_jobs=self.n_cores)(delayed(self._calc_full_loop)(i) for i in tqdm(range(len(self.param_list)), desc="1/2"))
+        try:
+            full = Parallel(n_jobs=self.n_cores)(delayed(self._calc_full_loop)(i) for i in tqdm(range(len(self.param_list)), desc="1/2"))
+        except TerminatedWorkerError:
+            print("TerminatedWorkerError was raised due to excessive memory usage. n_cores was reduced to 1.")
+            full = Parallel(n_jobs=1)(delayed(self._calc_full_loop)(i) for i in tqdm(range(len(self.param_list)), desc="1/2"))
         self.ypred_full = []
         self.x_scores_full = []
         self.y_loadings_ = []
@@ -78,7 +82,11 @@ class KFold(BaseCrossVal):
 
         # Actual loop CV including Monte-Carlo reps
         self.loop_mc = self.param_list * self.n_mc
-        ypred = Parallel(n_jobs=self.n_cores)(delayed(self._calc_cv_loop)(i) for i in tqdm(range(len(self.loop_mc)), desc="2/2"))
+        try:
+            ypred = Parallel(n_jobs=self.n_cores)(delayed(self._calc_cv_loop)(i) for i in tqdm(range(len(self.loop_mc)), desc="2/2"))
+        except TerminatedWorkerError:
+            print("TerminatedWorkerError was raised due to excessive memory usage. n_cores was reduced to 1.")
+            ypred = Parallel(n_jobs=1)(delayed(self._calc_cv_loop)(i) for i in tqdm(range(len(self.loop_mc)), desc="2/2"))
 
         # Split ypred into full / cv and put in final format
         # Format :::> self.ypred_full -> parameter_type -> monte-carlo -> y_true / y_pred
