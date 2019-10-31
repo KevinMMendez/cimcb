@@ -67,7 +67,7 @@ class BaseBootstrap(ABC):
     def calc_stat(self):
         """Stores selected attributes (from self.bootlist) for the original model."""
         self.stat = {}
-        self.model_orig.train(self.model_orig.X, self.model_orig.Y)
+        #self.model_orig.train(self.model_orig.X, self.model_orig.Y)
         self.model_orig.test(self.model_orig.X, self.model_orig.Y)
         for i in self.bootlist:
             self.stat[i] = nested_getattr(self.model_orig, i)
@@ -465,7 +465,7 @@ class BaseBootstrap(ABC):
         output_notebook()
         show(fig)
 
-    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True, orthog_line=True, grid_line=False, smooth=0, plot_roc='data'):
+    def plot_projections(self, label=None, size=12, ci95=True, scatterplot=False, weight_alt=False, bc="nonparametric", legend='all', plot='ci', scatter_ib=True, orthog_line=True, grid_line=False, smooth=0, plot_roc='median'):
         bootx = 1
         num_x_scores = len(self.stat['model.x_scores_'].T)
 
@@ -692,7 +692,7 @@ class BaseBootstrap(ABC):
                     jackstat = None
                     jackidx = None
 
-                grid[x, y] = roc_boot(self.Y, stat, bootstat, bootstat_oob, self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), width=width_height, height=width_height, label_font_size=label_font, legend=legend_roc, grid_line=grid_line, plot_num=plot_num, plot=plot_roc)
+                grid[x, y], _, _ = roc_boot(self.Y, stat, bootstat, bootstat_oob, self.bootidx, self.bootidx_oob, self.__name__, smoothval=smooth, jackstat=jackstat, jackidx=jackidx, xlabel="1-Specificity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), ylabel="Sensitivity ({}{}/{}{})".format(lv_name, x + 1, lv_name, y + 1), width=width_height, height=width_height, label_font_size=label_font, legend=legend_roc, grid_line=grid_line, plot_num=plot_num, plot=plot_roc)
 
             # Bokeh grid
             fig = gridplot(grid.tolist())
@@ -744,10 +744,10 @@ class BaseBootstrap(ABC):
         if peaklist is not None:
             PeakTable = PeakTable[PeakTable["Name"].isin(peaklist)]
         peaklabel = PeakTable[ylabel]
-
+        
         # Plot
         fig_1 = scatterCI(mid_coef, ci=ci_coef, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title=name_coef, sort_abs=sort, sort_ci=sort_ci, grid_line=grid_line, x_axis_below=x_axis_below)
-        if name_vip == "Variable Importance in Projection (VIP)":
+        if name_vip == "Variable Importance in Projection (VIP) Plot":
             fig_2 = scatterCI(mid_vip, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=1, col_hline=False, title=name_vip, sort_abs=sort, sort_ci=sort_ci, sort_ci_abs=True, grid_line=grid_line, x_axis_below=x_axis_below)
         else:
             fig_2 = scatterCI(mid_vip, ci=ci_vip, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=np.average(self.stat['model.vip_']), col_hline=False, title=name_vip, sort_abs=sort, sort_ci_abs=True, grid_line=grid_line, x_axis_below=x_axis_below)

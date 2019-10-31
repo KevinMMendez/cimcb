@@ -403,7 +403,7 @@ def roc_boot(Y,
              legend_basic=False,
              train=None,
              ci_only=False):
-
+    
     # Set positive
     auc_check = roc_auc_score(Y, stat)
     if auc_check > 0.5:
@@ -429,23 +429,23 @@ def roc_boot(Y,
         Ytrue_boot = Y[bootidx[i]]
         fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=pos, drop_intermediate=False)
         auc_boot = metrics.auc(fpr_boot, tpr_boot)
-        # if auc_boot > 0.5:
-        #     pos_loop.append(pos)
-        # else:
-        #   fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
-        #   pos_loop.append(abs(1 - pos))
+        if auc_boot > 0.5:
+            pos_loop.append(pos)
+        else:
+          fpr_boot, tpr_boot, _ = metrics.roc_curve(Ytrue_boot, Yscore_boot, pos_label=abs(1 - pos), drop_intermediate=False)
+          pos_loop.append(abs(1 - pos))
 
         # Drop intermediates when fpr = 0
-        # tpr0_boot = tpr_boot[fpr_boot == 0][-1]
-        # tpr_boot = np.concatenate([[tpr0_boot], tpr_boot[fpr_boot > 0]])
-        # fpr_boot = np.concatenate([[0], fpr_boot[fpr_boot > 0]])
+        tpr0_boot = tpr_boot[fpr_boot == 0][-1]
+        tpr_boot = np.concatenate([[tpr0_boot], tpr_boot[fpr_boot > 0]])
+        fpr_boot = np.concatenate([[0], fpr_boot[fpr_boot > 0]])
 
-        # # Vertical averaging
-        # idx = [np.abs(i - fpr_boot).argmin() for i in fpr_linspace]
-        # tpr_bootstat.append(np.array(tpr_boot[idx]))
+        # Vertical averaging
+        idx = [np.abs(i - fpr_boot).argmin() for i in fpr_linspace]
+        tpr_bootstat.append(np.array(tpr_boot[idx]))
 
-        tpr_boot = interp(fpr_linspace, fpr_boot, tpr_boot)
-        tpr_bootstat.append(tpr_boot)
+#         tpr_boot = interp(fpr_linspace, fpr_boot, tpr_boot)
+#         tpr_bootstat.append(tpr_boot)
 
     if method == 'BCA':
         tpr_jackstat = []
@@ -455,8 +455,8 @@ def roc_boot(Y,
             Ytrue_jack = Y[jackidx[i]]
             fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=pos, drop_intermediate=False)
             auc_jack = metrics.auc(fpr_jack, tpr_jack)
-            # if auc_jack < 0.5:
-            #     fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=abs(1 - pos), drop_intermediate=False)
+#             if auc_jack < 0.5:
+#                 fpr_jack, tpr_jack, _ = metrics.roc_curve(Ytrue_jack, Yscore_jack, pos_label=abs(1 - pos), drop_intermediate=False)
 
             # Drop intermediates when fpr = 0
             tpr0_jack = tpr_jack[fpr_jack == 0][-1]
@@ -469,26 +469,32 @@ def roc_boot(Y,
 
     if method == 'BCA':
         tpr_ib = bca_method(tpr_bootstat, tpr_list, tpr_jackstat)
-        tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
-        tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     if method == 'Per':
         tpr_ib = per_method(tpr_bootstat, tpr_list)
-        tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
-        tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
 
     if method == 'CPer':
         tpr_ib = cper_method(tpr_bootstat, tpr_list)
-        tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
-        tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
-
+    
+    tpr_ib = np.array(tpr_ib)
     # ROC up
     if method != 'Per':
       for i in range(len(tpr_ib.T)):
           for j in range(1, len(tpr_ib)):
               if tpr_ib[j, i] < tpr_ib[j - 1, i]:
                   tpr_ib[j, i] = tpr_ib[j - 1, i]
+                    
+    # Check upper limit / lower limit
+    if method != 'Per':
+        for i in range(len(tpr_ib)):
+            if tpr_ib[i][0] > tpr_list[i]:
+                tpr_ib[i][0] = tpr_list[i]
+            if tpr_ib[i][1] < tpr_list[i]:
+                tpr_ib[i][1] = tpr_list[i]
 
+    tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
+    tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
+        
     # Get tpr mid
     if method != 'Per':
         tpr_ib[:, 2] = (tpr_ib[:, 0] + tpr_ib[:, 1]) / 2
@@ -508,15 +514,15 @@ def roc_boot(Y,
         auc_bootstat_oob.append(auc_boot_oob)
 
         # Drop intermediates when fpr = 0
-        # tpr0_boot_oob = tpr_boot_oob[fpr_boot_oob == 0][-1]
-        # tpr_boot_oob = np.concatenate([[tpr0_boot_oob], tpr_boot_oob[fpr_boot_oob > 0]])
-        # fpr_boot_oob = np.concatenate([[0], fpr_boot_oob[fpr_boot_oob > 0]])
+        tpr0_boot_oob = tpr_boot_oob[fpr_boot_oob == 0][-1]
+        tpr_boot_oob = np.concatenate([[tpr0_boot_oob], tpr_boot_oob[fpr_boot_oob > 0]])
+        fpr_boot_oob = np.concatenate([[0], fpr_boot_oob[fpr_boot_oob > 0]])
 
-        # # Vertical averaging
-        # idx_oob = [np.abs(i - fpr_boot_oob).argmin() for i in fpr_linspace]
-        # tpr_bootstat_oob.append(np.array(tpr_boot_oob[idx_oob]))
-        tpr_boot_oob = interp(fpr_linspace, fpr_boot_oob, tpr_boot_oob)
-        tpr_bootstat_oob.append(tpr_boot_oob)
+        # Vertical averaging
+        idx_oob = [np.abs(i - fpr_boot_oob).argmin() for i in fpr_linspace]
+        tpr_bootstat_oob.append(np.array(tpr_boot_oob[idx_oob]))
+        #tpr_boot_oob = interp(fpr_linspace, fpr_boot_oob, tpr_boot_oob)
+        #tpr_bootstat_oob.append(tpr_boot_oob)
 
     # Get CI for tpr
     tpr_oob_lowci = np.percentile(tpr_bootstat_oob, 2.5, axis=0)
@@ -576,15 +582,6 @@ def roc_boot(Y,
 
     fpr_linspace = np.insert(fpr_linspace, 0, 0)  # Add starting 0
     fpr_linspace  = np.concatenate((fpr_linspace, [1]))  # Add end 1
-
-
-    # Check upper limit / lower limit
-    if method != 'Per':
-      for i in tpr_ib:
-        if i[0] > i[2]:
-          i[0] = i[2]
-        if i[1] < i[2]:
-          i[1] = i[2]
 
     # Calculate AUC
     auc_ib_low = metrics.auc(fpr_linspace, tpr_ib[:, 0])
@@ -745,9 +742,8 @@ def roc_boot(Y,
     ib_text = "IB (AUC = {:.2f} +/- {:.2f})".format(auc_ib[2], (auc_ib[1] - auc_ib[0])/2)
     oob_text = "OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob[2], (auc_oob[1] - auc_oob[0])/2)
 
-
     fig.legend.visible =  False
-
+    
     if legend_basic == True:
       fig.legend.location = "bottom_right"
       fig.legend.visible = True
@@ -772,7 +768,7 @@ def roc_boot(Y,
           fig.add_layout(test_text_add)
 
 
-          fig.quad(top=0.28, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+          fig.quad(top=0.28, bottom=0, left=0.30, right=1, color='white', alpha=1,  line_color='lightgrey')
 
           fig.circle(0.34,0.22,color='green',size=8)
           fig.circle(0.34,0.14,color='orange',size=8)
@@ -792,7 +788,7 @@ def roc_boot(Y,
                   fig.add_layout(oob_text_add)
 
 
-                  fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,line_color='black')
+                  fig.quad(top=0.20, bottom=0, left=0.30, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                   fig.circle(0.34,0.14,color='green',size=8)
                   fig.circle(0.34,0.06,color='orange',size=8)
@@ -808,26 +804,27 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add)
 
 
-                    fig.quad(top=0.25, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                    fig.quad(top=0.25, bottom=0, left=0.42, right=1, color='white', alpha=0.4,  line_color='lightgrey')
 
                     fig.circle(0.47,0.17,color='green',size=8)
                     fig.circle(0.47,0.07,color='orange',size=8)
                 elif width == 316:
-                    ib_text_add = Label(x=0.30, y=0.15,
-                                     text=ib_text, render_mode='canvas', text_font_size= '6.8pt')
+                    ib_text_add = Label(x=0.22, y=0.15,
+                                     text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
                     fig.add_layout(ib_text_add)
 
-                    oob_text_add = Label(x=0.30, y=0.05,
-                                     text=oob_text, render_mode='canvas', text_font_size= '6.8pt')
+                    oob_text_add = Label(x=0.22, y=0.05,
+                                     text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
                     fig.add_layout(oob_text_add)
 
 
-                    fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
-                    fig.circle(0.25,0.18,color='green',size=8)
-                    fig.circle(0.25,0.08,color='orange',size=8)
+                    fig.circle(0.17,0.18,color='green',size=8)
+                    fig.circle(0.17,0.08,color='orange',size=8)
+                    
                 elif width == 237:
                     ib_text_1 = "IB (AUC = {:.2f}".format(auc_ib[2])
                     ib_text_2 = "+/- {:.2f})".format((auc_ib[1] - auc_ib[0])/2)
@@ -857,7 +854,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.4, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.4, bottom=0, left=0.20, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.27,0.30,color='green',size=8)
                     fig.circle(0.27,0.10,color='orange',size=8)
@@ -890,7 +887,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.30,color='green',size=8)
                     fig.circle(0.20,0.10,color='orange',size=8)
@@ -923,7 +920,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.30,color='green',size=8)
                     fig.circle(0.20,0.10,color='orange',size=8)
@@ -956,7 +953,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.30,color='green',size=8)
                     fig.circle(0.20,0.10,color='orange',size=8)
@@ -970,7 +967,7 @@ def roc_boot(Y,
 
                     fig.add_layout(ib_text_add)
 
-                    fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                    fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,  line_color='lightgrey')
 
                     fig.circle(0.47,0.05,color='green',size=8)
                 elif width == 316:
@@ -979,7 +976,7 @@ def roc_boot(Y,
 
                     fig.add_layout(ib_text_add)
 
-                    fig.quad(top=0.10, bottom=0, left=0.20, right=1, color='white', alpha=0.4,line_color='black')
+                    fig.quad(top=0.10, bottom=0, left=0.20, right=1, color='white', alpha=0.4,  line_color='lightgrey')
 
                     fig.circle(0.25,0.05,color='green',size=8)
                 elif width == 237:
@@ -998,7 +995,7 @@ def roc_boot(Y,
 
                     fig.add_layout(ib_text_add_2)
 
-                    fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.27,0.10,color='green',size=8)
                 elif width == 190:
@@ -1017,7 +1014,7 @@ def roc_boot(Y,
                     fig.add_layout(ib_text_add_2)
 
 
-                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.10,color='green',size=8)
                 elif width == 158:
@@ -1036,7 +1033,7 @@ def roc_boot(Y,
                     fig.add_layout(ib_text_add_2)
 
 
-                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,   line_color='lightgrey')
 
                     fig.circle(0.20,0.10,color='green',size=8)
                 elif width == 135:
@@ -1055,7 +1052,7 @@ def roc_boot(Y,
                     fig.add_layout(ib_text_add_2)
 
 
-                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.10,color='green',size=8)
                 else:
@@ -1071,7 +1068,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add)
 
 
-                    fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                    fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,  line_color='lightgrey')
 
                     fig.circle(0.47,0.05,color='orange',size=8)
                     # fig.circle(0.47,0.07,color='orange',size=8)
@@ -1083,7 +1080,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add)
 
 
-                    fig.quad(top=0.10, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.10, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.17,0.05,color='orange',size=8)
                 elif width == 237:
@@ -1103,7 +1100,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.2, bottom=0, left=0.20, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.27,0.10,color='orange',size=8)
                 elif width == 190:
@@ -1122,7 +1119,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.10,color='orange',size=8)
                 elif width == 158:
@@ -1143,7 +1140,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,  line_color='lightgrey')
 
                     fig.circle(0.20,0.10,color='orange',size=8)
                 elif width == 135:
@@ -1163,7 +1160,7 @@ def roc_boot(Y,
                     fig.add_layout(oob_text_add_2)
 
 
-                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                    fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1, line_color='lightgrey')
 
                     fig.circle(0.20,0.10,color='orange',size=8)
                 else:
@@ -1299,7 +1296,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
     auc_cv2 = np.round(auc_ci, 2)
     ib_text = "FULL (AUC = {:.2f})".format(auc_full)
     oob_text = "CV (AUC = {:.2f} +/- {:.2f})".format(auc_cv1, auc_cv2)
-
+    
     fig.legend.visible =  False
     if legend == True:
         if plot_num in [0,1,4]:
@@ -1315,59 +1312,42 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add)
 
 
-                fig.quad(top=0.25, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                fig.quad(top=0.25, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='lightgrey')
 
                 fig.circle(0.47,0.17,color='green',size=8)
                 fig.circle(0.47,0.07,color='orange',size=8)
             elif width == 316:
                 ib_text_add = Label(x=0.30, y=0.15,
-                                 text=ib_text, render_mode='canvas', text_font_size= '6.8pt')
+                                 text=ib_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(ib_text_add)
 
                 oob_text_add = Label(x=0.30, y=0.05,
-                                 text=oob_text, render_mode='canvas', text_font_size= '6.8pt')
+                                 text=oob_text, render_mode='canvas', text_font_size= '10pt')
 
                 fig.add_layout(oob_text_add)
 
 
-                fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.25,0.18,color='green',size=8)
                 fig.circle(0.25,0.08,color='orange',size=8)
             elif width == 237:
-                ib_text_1 = "FULL (AUC = "
-                ib_text_2 = "{:.2f})".format(auc_full)
+                ib_text_add = Label(x=0.30, y=0.15,
+                                 text=ib_text, render_mode='canvas', text_font_size= '6.4pt')
 
-                oob_text_1 = "CV (AUC ="
-                oob_text_2 = "{:.2f} +/- {:.2f})".format(auc_cv1, auc_cv2)
+                fig.add_layout(ib_text_add)
 
+                oob_text_add = Label(x=0.30, y=0.05,
+                                 text=oob_text, render_mode='canvas', text_font_size= '6.4pt')
 
-                ib_text_add_1 = Label(x=0.38, y=0.28,
-                                 text=ib_text_1, render_mode='canvas', text_font_size= '6.8pt')
-
-                fig.add_layout(ib_text_add_1)
-
-                ib_text_add_2 = Label(x=0.38, y=0.19,
-                                 text=ib_text_2, render_mode='canvas', text_font_size= '6.8pt')
-
-                fig.add_layout(ib_text_add_2)
-
-                oob_text_add_1 = Label(x=0.38, y=0.09,
-                                 text=oob_text_1, render_mode='canvas', text_font_size= '6.8pt')
-
-                fig.add_layout(oob_text_add_1)
-
-                oob_text_add_2 = Label(x=0.38, y=0.00,
-                                 text=oob_text_2, render_mode='canvas', text_font_size= '6.8pt')
-
-                fig.add_layout(oob_text_add_2)
+                fig.add_layout(oob_text_add)
 
 
-                fig.quad(top=0.4, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.25, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='lightgrey')
 
-                fig.circle(0.27,0.30,color='green',size=8)
-                fig.circle(0.27,0.10,color='orange',size=8)
+                fig.circle(0.25,0.18,color='green',size=8)
+                fig.circle(0.25,0.08,color='orange',size=8)
             elif width == 190:
                 ib_text_1 = "FULL (AUC ="
                 ib_text_2 = "{:.2f})".format(auc_full)
@@ -1397,7 +1377,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1, line_color='lightgrey')
 
                 fig.circle(0.20,0.30,color='green',size=8)
                 fig.circle(0.20,0.10,color='orange',size=8)
@@ -1430,7 +1410,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.30,color='green',size=8)
                 fig.circle(0.20,0.10,color='orange',size=8)
@@ -1463,7 +1443,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.47, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.30,color='green',size=8)
                 fig.circle(0.20,0.10,color='orange',size=8)
@@ -1477,7 +1457,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
                 fig.add_layout(ib_text_add)
 
-                fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='lightgrey')
 
                 fig.circle(0.47,0.05,color='green',size=8)
             elif width == 316:
@@ -1486,7 +1466,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
                 fig.add_layout(ib_text_add)
 
-                fig.quad(top=0.12, bottom=0, left=0.30, right=1, color='white', alpha=0.4,line_color='black')
+                fig.quad(top=0.12, bottom=0, left=0.30, right=1, color='white', alpha=0.4,line_color='lightgrey')
 
                 fig.circle(0.35,0.05, color='green',size=8)
             elif width == 237:
@@ -1505,7 +1485,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
 
                 fig.add_layout(ib_text_add_2)
 
-                fig.quad(top=0.21, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.21, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.27,0.10,color='green',size=8)
             elif width == 190:
@@ -1524,7 +1504,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(ib_text_add_2)
 
 
-                fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.10,color='green',size=8)
             elif width == 158:
@@ -1543,7 +1523,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(ib_text_add_2)
 
 
-                fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.10,color='green',size=8)
             elif width == 135:
@@ -1562,7 +1542,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(ib_text_add_2)
 
 
-                fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.25, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.10,color='green',size=8)
             else:
@@ -1578,7 +1558,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add)
 
 
-                fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='black')
+                fig.quad(top=0.10, bottom=0, left=0.42, right=1, color='white', alpha=0.4,line_color='lightgrey')
 
                 fig.circle(0.47,0.05,color='orange',size=8)
                 # fig.circle(0.47,0.07,color='orange',size=8)
@@ -1590,7 +1570,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add)
 
 
-                fig.quad(top=0.11, bottom=0, left=0.17, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.11, bottom=0, left=0.17, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.22,0.05,color='orange',size=8)
             elif width == 237:
@@ -1610,7 +1590,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.21, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.21, bottom=0, left=0.20, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.27,0.10,color='orange',size=8)
             elif width == 190:
@@ -1629,7 +1609,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.10,color='orange',size=8)
             elif width == 158:
@@ -1650,7 +1630,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.10,color='orange',size=8)
             elif width == 135:
@@ -1669,7 +1649,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
                 fig.add_layout(oob_text_add_2)
 
 
-                fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='black')
+                fig.quad(top=0.24, bottom=0, left=0.12, right=1, color='white', alpha=1,line_color='lightgrey')
 
                 fig.circle(0.20,0.10,color='orange',size=8)
             else:
@@ -1785,7 +1765,7 @@ def bca_method(bootstat, stat, jackstat):
             # for i in range(len(pct3)):
             #     if np.isnan(pct3[i]) == True:
             #         pct3[i] = (pct2[i] + pct1[i]) / 2
-
+        
         boot_ci = []
         for i in range(len(pct1)):
             bootstat_i = [item[i] for item in bootstat]
