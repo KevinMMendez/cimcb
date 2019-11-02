@@ -744,7 +744,7 @@ class BaseBootstrap(ABC):
         if peaklist is not None:
             PeakTable = PeakTable[PeakTable["Name"].isin(peaklist)]
         peaklabel = PeakTable[ylabel]
-        
+
         # Plot
         fig_1 = scatterCI(mid_coef, ci=ci_coef, label=peaklabel, hoverlabel=PeakTable[["Idx", "Name", "Label"]], hline=0, col_hline=True, title=name_coef, sort_abs=sort, sort_ci=sort_ci, grid_line=grid_line, x_axis_below=x_axis_below)
         if name_vip == "Variable Importance in Projection (VIP) Plot":

@@ -328,7 +328,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='standard', alt=True, grid_line=False):
+    def plot(self, metric="r2q2", scale=1, color_scaling="tanh", rotate_xlabel=True, model="kfold", legend=True, color_beta=[10, 10, 10], ci=95, diff1_heat=True, style=1, method='absolute', alt=True, grid_line=False):
         """Create a full/cv plot using based on metric selected.
 
         Parameters
@@ -354,7 +354,7 @@ class BaseCrossVal(ABC):
         output_notebook()
         show(fig)
 
-    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend=True, ci=95, method='ratio', style=0, alt=True, grid_line=False):
+    def _plot_param1(self, metric="r2q2", scale=1, rotate_xlabel=True, model="kfold", title_align="center", legend=True, ci=95, method='absolute', style=0, alt=True, grid_line=False):
         """Used for plot function if the number of parameters is 1."""
 
         size_a = 13
@@ -418,6 +418,10 @@ class BaseCrossVal(ABC):
                     diff_text = "| (R² - Q²) / R² |"
                 else:
                     diff_text = "| (" + full_text[:-4] + "full - " + full_text[:-4] + "cv) / " + full_text[:-4] + "full |"
+        elif method in ['absolute', 'abs']:
+            pass
+        else:
+            raise ValueError("method needs to be 'absolute' or 'ratio'.")
 
         # round full, cv, and diff for hovertool
         full_hover = []
@@ -659,6 +663,10 @@ class BaseCrossVal(ABC):
 
         if method is 'ratio':
             color_beta[2] = color_beta[2] / 10
+        elif method in ['absolute', 'abs']:
+            pass
+        else:
+            raise ValueError("method needs to be 'absolute' or 'ratio'.")
 
         # Get ci
         if self.n_mc > 1:

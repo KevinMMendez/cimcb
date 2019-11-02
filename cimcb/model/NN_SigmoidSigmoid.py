@@ -85,7 +85,7 @@ class NN_SigmoidSigmoid(BaseModel):
             self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
             self.model.w1 = self.model.layers[0].get_weights()
             self.model.w2 = self.model.layers[1].get_weights()
-            self.compiled == True
+            self.compiled = True
         else:
             self.model.layers[0].set_weights(self.model.w1)
             self.model.layers[1].set_weights(self.model.w2)

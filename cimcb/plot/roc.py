@@ -403,7 +403,7 @@ def roc_boot(Y,
              legend_basic=False,
              train=None,
              ci_only=False):
-    
+
     # Set positive
     auc_check = roc_auc_score(Y, stat)
     if auc_check > 0.5:
@@ -467,6 +467,7 @@ def roc_boot(Y,
             idx = [np.abs(i - fpr_jack).argmin() for i in fpr_linspace]
             tpr_jackstat.append(np.array(tpr_jack[idx]))
 
+    save_stat = [tpr_bootstat, tpr_list, tpr_jackstat, fpr_linspace]
     if method == 'BCA':
         tpr_ib = bca_method(tpr_bootstat, tpr_list, tpr_jackstat)
 
@@ -475,7 +476,7 @@ def roc_boot(Y,
 
     if method == 'CPer':
         tpr_ib = cper_method(tpr_bootstat, tpr_list)
-    
+
     tpr_ib = np.array(tpr_ib)
     # ROC up
     if method != 'Per':
@@ -483,8 +484,8 @@ def roc_boot(Y,
           for j in range(1, len(tpr_ib)):
               if tpr_ib[j, i] < tpr_ib[j - 1, i]:
                   tpr_ib[j, i] = tpr_ib[j - 1, i]
-                    
-    # Check upper limit / lower limit
+
+    # # Check upper limit / lower limit
     if method != 'Per':
         for i in range(len(tpr_ib)):
             if tpr_ib[i][0] > tpr_list[i]:
@@ -494,10 +495,12 @@ def roc_boot(Y,
 
     tpr_ib = np.concatenate((np.zeros((1, 3)), tpr_ib), axis=0)  # Add starting 0
     tpr_ib = np.concatenate((tpr_ib, np.ones((1, 3))), axis=0)  # Add end 1
-        
+
     # Get tpr mid
     if method != 'Per':
         tpr_ib[:, 2] = (tpr_ib[:, 0] + tpr_ib[:, 1]) / 2
+
+    #print('testing.')
 
     # Calculate for OOB
     auc_bootstat_oob = []
@@ -743,7 +746,7 @@ def roc_boot(Y,
     oob_text = "OOB (AUC = {:.2f} +/- {:.2f})".format(auc_oob[2], (auc_oob[1] - auc_oob[0])/2)
 
     fig.legend.visible =  False
-    
+
     if legend_basic == True:
       fig.legend.location = "bottom_right"
       fig.legend.visible = True
@@ -824,7 +827,7 @@ def roc_boot(Y,
 
                     fig.circle(0.17,0.18,color='green',size=8)
                     fig.circle(0.17,0.08,color='orange',size=8)
-                    
+
                 elif width == 237:
                     ib_text_1 = "IB (AUC = {:.2f}".format(auc_ib[2])
                     ib_text_2 = "+/- {:.2f})".format((auc_ib[1] - auc_ib[0])/2)
@@ -1296,7 +1299,7 @@ def roc_cv(Y_predfull, Y_predcv, Ytrue, width=450, height=350, xlabel="1-Specifi
     auc_cv2 = np.round(auc_ci, 2)
     ib_text = "FULL (AUC = {:.2f})".format(auc_full)
     oob_text = "CV (AUC = {:.2f} +/- {:.2f})".format(auc_cv1, auc_cv2)
-    
+
     fig.legend.visible =  False
     if legend == True:
         if plot_num in [0,1,4]:
@@ -1765,7 +1768,7 @@ def bca_method(bootstat, stat, jackstat):
             # for i in range(len(pct3)):
             #     if np.isnan(pct3[i]) == True:
             #         pct3[i] = (pct2[i] + pct1[i]) / 2
-        
+
         boot_ci = []
         for i in range(len(pct1)):
             bootstat_i = [item[i] for item in bootstat]

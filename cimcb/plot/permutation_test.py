@@ -5,6 +5,7 @@ from pydoc import locate
 from copy import deepcopy, copy
 from joblib import Parallel, delayed
 from bokeh.layouts import gridplot
+from statsmodels.stats.weightstats import ttest_ind
 from bokeh.models import HoverTool, Slope, Span
 from bokeh.plotting import ColumnDataSource, figure
 from scipy.stats import ttest_1samp
@@ -186,13 +187,13 @@ class permutation_test():
         x2_pdf = scipy.stats.gaussian_kde(X2, "scott")
         x2_pdf_grid = x2_pdf(x2_grid)
         x2_pdf_grid = [-x for x in x2_pdf_grid]
-        
+
         # Figure 2
         if hide_pval == True:
             y_range_share2 = (min_vals - abs(0.2 * min_vals), max_vals + abs(0.1 * max_vals))
             ymin = min(x2_pdf_grid) - 1
             xmin = max(x1_pdf_grid) + 1
-            yy_range = (ymin - abs(0.1 * ymin),xmin + abs(0.1 * xmin))
+            yy_range = (ymin - abs(0.1 * ymin), xmin + abs(0.1 * xmin))
         else:
             y_range_share2 = (min_vals - abs(0.2 * min_vals), max_vals + 0.8)
             ymin = min(x2_pdf_grid) - 1.2
@@ -214,8 +215,9 @@ class permutation_test():
 
         # Lollipops R2
         # Do a t-test
-        a = ttest_1samp(stats_r2[1:], [stats_r2[0]])[1][0]
-        b = a / 2
+        #a = ttest_1samp(stats_r2[1:], [stats_r2[0]])[1][0]
+        #b = a / 2
+        b = ttest_ind(stats_r2[1:], [stats_r2[0]], alternative='smaller')[1]
         if b > 0.005:
             data2_manu = "%0.2f" % b
         else:
@@ -226,18 +228,24 @@ class permutation_test():
         source2 = ColumnDataSource(data=data2)
         data2_line = {"x": [stats_r2[0], stats_r2[0]], "y": [max(x1_pdf_grid) + 1, 0], "hover": [str(data2_manu), str(data2_manu)]}
         source2_line = ColumnDataSource(data=data2_line)
-        r2fig2_line = fig2.line("x", "y", line_width=2.25, line_color="red",  alpha=0.5,source=source2_line)
-        r2fig2 = fig2.circle("x", "y", fill_color="red", line_color="grey",  alpha=0.75, size=7, legend=full_text, source=source2)
+        r2fig2_line = fig2.line("x", "y", line_width=2.25, line_color="red", alpha=0.5, source=source2_line)
+        r2fig2 = fig2.circle("x", "y", fill_color="red", line_color="grey", alpha=0.75, size=7, legend=full_text, source=source2)
 
         # Lollipops Q2
         # Do a t-test
-        if ttest_1samp(stats_q2[1:], [stats_q2[0]])[1][0] / 2 > 0.005:
-            a = ttest_1samp(stats_q2[1:], [stats_q2[0]])[1][0]
-            b = a / 2
+        # if ttest_1samp(stats_q2[1:], [stats_q2[0]])[1][0] / 2 > 0.005:
+        #     a = ttest_1samp(stats_q2[1:], [stats_q2[0]])[1][0]
+        #     b = a / 2
+        #     data3_manu = "%0.2f" % b
+        # else:
+        #     a = ttest_1samp(stats_q2[1:], [stats_q2[0]])[1][0]
+        #     b = a / 2
+        #     data3_manu = "%0.2e" % b
+
+        b = ttest_ind(stats_q2[1:], [stats_q2[0]], alternative='smaller')[1]
+        if b > 0.005:
             data3_manu = "%0.2f" % b
         else:
-            a = ttest_1samp(stats_q2[1:], [stats_q2[0]])[1][0]
-            b = a / 2
             data3_manu = "%0.2e" % b
 
         # Plot
