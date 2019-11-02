@@ -1,6 +1,6 @@
 package:
   name: cimcb
-  version: 2.0.36
+  version: 2.0.37
 
 source:
   path: ../
@@ -22,7 +22,6 @@ requirements:
     - scikit-learn
     - statsmodels
     - python >=3.5
-    - tensorflow
     - theano
     - tqdm
     - xlrd
@@ -38,7 +37,6 @@ requirements:
     - scipy
     - scikit-learn
     - statsmodels
-    - tensorflow
     - theano
     - tqdm
     - xlrd
