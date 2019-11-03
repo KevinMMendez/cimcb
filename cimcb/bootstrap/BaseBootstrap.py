@@ -182,7 +182,7 @@ class BaseBootstrap(ABC):
 
         return [bootstatloop, bootstatloop_oob]
 
-    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='roc', grid_line=False, smooth=0, plot_roc='data', testset=None, show_table=True, trainset=None):
+    def evaluate(self, parametric=True, errorbar=False, specificity=False, cutoffscore=False, title_align="left", dist_smooth=None, bc='nonparametric', label=None, legend='all', grid_line=False, smooth=0, plot_roc='data', testset=None, show_table=True, trainset=None):
 
         test = testset
         self.train = trainset
@@ -397,7 +397,7 @@ class BaseBootstrap(ABC):
         output_notebook()
         show(fig)
 
-    def plot_loadings(self, PeakTable, peaklist=None, ylabel="Label", sort=False, sort_ci=True, grid_line=False, plot='data', x_axis_below=True):
+    def plot_loadings(self, PeakTable, peaklist=None, data=None, ylabel="Label", sort=False, sort_ci=True, grid_line=False, plot='data', x_axis_below=True):
         """Plots feature importance metrics.
 
         Parameters
@@ -423,13 +423,18 @@ class BaseBootstrap(ABC):
         n_loadings = len(self.bootci["model.x_loadings_"])
         ci_loadings = self.bootci["model.x_loadings_"]
 
-        if plot == 'data':
-            mid = self.stat['model.x_loadings_']
+        if isinstance(plot, str):
+            if plot == 'data':
+                mid = self.stat['model.x_loadings_']
+            elif plot == 'median':
+                mid = []
+                for i in self.bootci['model.x_loadings_']:
+                    mid.append(i[:, 2])
+                mid = np.array(mid).T
+            else:
+                pass
         else:
-            mid = []
-            for i in self.bootci['model.x_loadings_']:
-                mid.append(i[:, 2])
-            mid = np.array(mid).T
+            mid = plot
 
         # Remove rows from PeakTable if not in peaklist
         if peaklist is not None:
@@ -510,7 +515,8 @@ class BaseBootstrap(ABC):
         for i in range(len(self.bootidx_oob)):
             val = self.bootstat_oob['model.pctvar_'][i]
             pctvar_all.append(val)
-        pctvar_ = np.median(pctvar_all, 0)
+        #pctvar_ = np.median(pctvar_all, 0)
+        pctvar_ = self.stat['model.pctvar_']
 
         # y_loadings_
         y_loadings_all = []
@@ -726,12 +732,25 @@ class BaseBootstrap(ABC):
         ci_coef = self.bootci["model.coef_"]
         ci_vip = self.bootci["model.vip_"]
 
-        if plot == 'data':
-            mid_coef = self.stat['model.coef_']
-            mid_vip = self.stat['model.vip_']
+        if isinstance(plot, str):
+            if plot == 'data':
+                mid_coef = self.stat['model.coef_']
+                mid_vip = self.stat['model.vip_']
+            elif plot == 'median':
+                mid_coef = self.bootci['model.coef_'][:, 2]
+                mid_vip = self.bootci['model.vip_'][:, 2]
+            else:
+                pass
         else:
-            mid_coef = self.bootci['model.coef_'][:, 2]
-            mid_vip = self.bootci['model.vip_'][:, 2]
+            mid_coef = plot[:, 0]
+            mid_vip = plot[:, 1]
+
+        # if plot == 'data':
+        #     mid_coef = self.stat['model.coef_']
+        #     mid_vip = self.stat['model.vip_']
+        # else:
+        #     mid_coef = self.bootci['model.coef_'][:, 2]
+        #     mid_vip = self.bootci['model.vip_'][:, 2]
 
         if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             name_coef = "Feature Importance: Connection Weight"
@@ -770,6 +789,11 @@ class BaseBootstrap(ABC):
         Peaksheet["Coef-95CI"] = coef["Coef-95CI"].values
         Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
 
+        if isinstance(plot, str):
+            pass
+        else:
+            Peaksheet["Coef_Test"] = mid_coef
+            Peaksheet["VIP_Test"] = mid_vip
         return Peaksheet
 
     def save_results(self, name="table.xlsx"):

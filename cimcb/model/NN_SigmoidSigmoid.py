@@ -67,7 +67,9 @@ class NN_SigmoidSigmoid(BaseModel):
 
         # If batch-size is None:
         if self.batch_size is None:
-            self.batch_size = len(X)
+            batch_size = len(X)
+        else:
+            batch_size = self.batch_size
         self.X = X
         self.Y = Y
 
@@ -78,6 +80,9 @@ class NN_SigmoidSigmoid(BaseModel):
             self.epoch = Callback()
 
         if self.compiled == False:
+            # try:
+            #     np.random.seed((self.seed + 1))  # Allow  0
+            # except:
             np.random.seed(self.seed)
             self.model = Sequential()
             self.model.add(Dense(self.n_neurons, activation="sigmoid", input_dim=len(X.T)))
@@ -100,7 +105,7 @@ class NN_SigmoidSigmoid(BaseModel):
             self.model.w2 = w2
 
         # Fit
-        self.model.fit(X, Y, epochs=self.n_epochs, batch_size=self.batch_size, verbose=self.verbose)
+        self.model.fit(X, Y, epochs=self.n_epochs, batch_size=batch_size, verbose=self.verbose)
 
         self.model.pctvar_ = pctvar_calc(self.model, X, Y)
         #print("After: {} .... {}".format(self.model.layers[1].get_weights()[0].flatten(), self.model.pctvar_))
@@ -160,6 +165,9 @@ class NN_SigmoidSigmoid(BaseModel):
         for key, value in bm.items():
             self.model.eval_metrics_.append(value)
             self.metrics_key.append(key)
+
+        self.x_loadings_ = self.model.x_loadings_
+        self.feature_importance_ = np.array([self.model.coef_, self.model.vip_]).T
 
         self.model.eval_metrics_ = np.array(self.model.eval_metrics_)
 

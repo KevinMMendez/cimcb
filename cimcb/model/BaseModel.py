@@ -62,7 +62,7 @@ class BaseModel(ABC):
             raise ValueError("length of X does not match length of Y.")
         return X, Y
 
-    def permutation_test(self, metric='r2q2', nperm=100, folds=5, hide_pval=True, grid_line=False, legend=True):
+    def permutation_test(self, metric='r2q2', nperm=100, folds=5, hide_pval=False, grid_line=False, legend=True):
         """Plots permutation test figures.
 
         Parameters
@@ -162,7 +162,7 @@ class BaseModel(ABC):
 
         return Peaksheet
 
-    def plot_loadings(self, PeakTable, peaklist=None, ylabel="Label", sort=False, sort_ci=True):
+    def plot_loadings(self, PeakTable, data=None, peaklist=None, ylabel="Label", sort=False, sort_ci=True):
         """Plots feature importance metrics.
 
         Parameters
@@ -191,6 +191,10 @@ class BaseModel(ABC):
         else:
             ci_loadings = self.bootci["model.x_loadings_"]
 
+        if data == None:
+            x_load = self.model.x_loadings_[:, i]
+        else:
+            x_load = data
         # Remove rows from PeakTable if not in peaklist
         if peaklist is not None:
             PeakTable = PeakTable[PeakTable["Name"].isin(peaklist)]
@@ -205,7 +209,7 @@ class BaseModel(ABC):
                 cii = None
             else:
                 cii = ci_loadings[i]
-            fig = scatterCI(self.model.x_loadings_[:, i],
+            fig = scatterCI(x_load,
                             ci=cii,
                             label=peaklabel,
                             hoverlabel=PeakTable[["Idx", "Name", "Label"]],
@@ -240,7 +244,7 @@ class BaseModel(ABC):
         #     Peaksheet["VIP-95CI"] = vip["VIP-95CI"].values
         # return Peaksheet
 
-    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=0, title_align="left", dist_smooth=None, bootmethod='BCA', show_table=True):
+    def evaluate(self, testset=None, plot_median=False, specificity=False, cutoffscore=False, bootnum=0, title_align="left", dist_smooth=None, bootmethod='BCA', show_table=True, label=None, legend='all'):
         """Plots a figure containing a Violin plot, Distribution plot, ROC plot and Binary Metrics statistics.
 
         Parameters
@@ -261,6 +265,33 @@ class BaseModel(ABC):
         #self.train(self.X, self.Y)
         Ytrue_train = self.Y_train
         Yscore_train = self.Y_pred_train.flatten()
+
+        Y = self.Y
+        if label is None:
+            label = ['0', '1']
+        else:
+            label1 = np.array(label[self.Y == 0])[0]
+            label2 = np.array(label[self.Y == 1])[0]
+            label = [str(label1), str(label2)]
+
+
+        legend_violin = False
+        legend_dist = False
+        legend_roc = False
+        if legend in [True, 'all']:
+            legend_violin = True
+            legend_dist = True
+            legend_roc = True
+        if legend in [False, 'none', None]:
+            legend_violin = False
+            legend_dist = False
+            legend_roc = False
+        if legend is "violin":
+            legend_violin = True
+        if legend is "dist":
+            legend_dist = True
+        if legend is "roc":
+            legend_roc = True
 
         # Get Ytrue_test, Yscore_test from testset
         if test is not None:
@@ -301,22 +332,22 @@ class BaseModel(ABC):
         if test is None:
             roc_bokeh, stat = roc(Ytrue_train, Yscore_train, bootnum=bootnum, width=320, height=315, method=bootmethod, legend_basic=show_table)
         else:
-            roc_bokeh, stat = roc(Ytrue_train, Yscore_train, test=test, bootnum=bootnum, width=320, height=315,  method=bootmethod, legend_basic=show_table)
+            roc_bokeh, stat = roc(Ytrue_train, Yscore_train, test=test, bootnum=bootnum, width=320, height=315,  method=bootmethod, legend_basic=show_table, legend=legend_roc)
 
         # Violin plot
         self.score = Yscore_train
         self.true = Ytrue_train
 
         if test is None:
-            violin_bokeh = boxplot(Yscore_train, Ytrue_train, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315, legend=False, label=['0','1'], font_size="10pt", label_font_size="10pt")
+            violin_bokeh = boxplot(Yscore_train, Ytrue_train, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#FFCCCC", "#CCE5FF"], width=320, height=315, legend=legend_violin, legend_title=True, label=['0','1'], font_size="10pt", label_font_size="10pt")
         else:
-            violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["Train (0)", "Test (0)", "Train (1)", "Test (1)"], group_name_sort=["Test (0)", "Test (1)", "Train (0)", "Train (1)"], legend=False, font_size="10pt", label_font_size="10pt")
+            violin_bokeh = boxplot(Yscore_combined, Ytrue_combined_name, xlabel="Class", ylabel="Predicted Score", violin=True, color=["#fcaeae", "#aed3f9", "#FFCCCC", "#CCE5FF"], width=320, height=315, group_name=["Train (0)", "Test (0)", "Train (1)", "Test (1)"], group_name_sort=["Test (0)", "Test (1)", "Train (0)", "Train (1)"], legend=legend_violin, legend_title=True, label=label+label, font_size="10pt", label_font_size="10pt")
 
         # Distribution plot
         if test is None:
             dist_bokeh = distribution(Yscore_train, group=Ytrue_train, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, smooth=dist_smooth, font_size="10pt", label_font_size="10pt")
         else:
-            dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, smooth=dist_smooth, font_size="10pt", label_font_size="10pt")
+            dist_bokeh = distribution(Yscore_combined, group=Ytrue_combined_name, kde=True, title="", xlabel="Predicted Score", ylabel="p.d.f.", width=320, height=315, smooth=dist_smooth, font_size="10pt", label_font_size="10pt", group_label=label, legend_location="top_left", legend=legend_dist, legend_title=True)
 
         self.stat = np.array(stat)
         if bootnum > 1:

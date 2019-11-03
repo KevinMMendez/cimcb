@@ -18,9 +18,6 @@ class permutation_test():
     def __init__(self, model, params, X, Y, nperm=100, folds=5):
         self.model = locate(model.__name__)
         self.params = params
-        # if seed is set, make sure it's none
-        if 'seed' in self.params:
-            params['seed'] = None
         self.skf = StratifiedKFold(n_splits=folds)
         self.folds = folds
         self.X = X
@@ -42,8 +39,13 @@ class permutation_test():
 
         # Calculate binary_metrics for stats_full
         y_pred_test = model.train(X, Y)
-        y_pred_full = model.test(X)
-        stats_full = binary_metrics(Y, y_pred_full)
+        #y_pred_full = model.test(X)
+        stats_full = binary_metrics(Y, y_pred_test)
+
+        # if seed is set, make sure it's none
+        if 'seed' in self.params:
+            self.params['seed'] = None
+        model = self.model(**self.params)
 
         # Calculate binary_metrics for stats_cv
         y_pred_cv = [None] * len(Y)
@@ -195,10 +197,15 @@ class permutation_test():
             xmin = max(x1_pdf_grid) + 1
             yy_range = (ymin - abs(0.1 * ymin), xmin + abs(0.1 * xmin))
         else:
-            y_range_share2 = (min_vals - abs(0.2 * min_vals), max_vals + 0.8)
+            y_range_share2 = [min_vals - abs(0.2 * min_vals), max_vals + 0.8]
             ymin = min(x2_pdf_grid) - 1.2
             xmin = max(x1_pdf_grid) + 1.2
             yy_range = (ymin - 1, xmin + 1)
+            if metric == "auc":
+                if y_range_share2[1] > 1.5:
+                    y_range_share2[1] = 1.5
+            y_range_share2 = tuple(y_range_share2)
+
         fig2 = figure(plot_width=470, plot_height=410, x_axis_label=full_text + " & " + cv_text, y_axis_label="p.d.f.", x_range=y_range_share2, y_range=yy_range)
         slope_0 = Span(location=0, dimension="width", line_color="black", line_width=2, line_alpha=0.3)
         fig2.add_layout(slope_0)
