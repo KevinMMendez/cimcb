@@ -143,7 +143,7 @@ class BaseBootstrap(ABC):
                             if key == 'model.x_scores_':
                                 value[i][:, j] = - value[i][:, j]
                                 self.bootstat[key] = value
-        except KeyError:
+        except:
             pass
 
         # Stop timer
@@ -156,8 +156,15 @@ class BaseBootstrap(ABC):
         # Set model
         model_i = self.model(**self.param)
         # Set X and Y
-        X_res = self.X[self.bootidx[i], :]
-        Y_res = self.Y[self.bootidx[i]]
+        try:
+            X_res = self.X[self.bootidx[i], :]
+            Y_res = self.Y[self.bootidx[i]]
+        except TypeError:
+            X_res = []
+            Y_res = self.Y[self.bootidx[i]]
+            for j in self.X:
+                X_res.append(j[self.bootidx[i], :])
+
         # Train and test
         if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
             model_i.train(X_res, Y_res, w1=self.w1, w2=self.w2)
@@ -174,8 +181,14 @@ class BaseBootstrap(ABC):
         bootstatloop_oob = {}
         for k in self.bootlist:
             bootstatloop_oob[k] = []
-        X_res_oob = self.X[self.bootidx_oob[i], :]
-        Y_res_oob = self.Y[self.bootidx_oob[i]]
+        try:
+            X_res_oob = self.X[self.bootidx_oob[i], :]
+            Y_res_oob = self.Y[self.bootidx_oob[i]]
+        except TypeError:
+            X_res_oob = []
+            Y_res_oob = self.Y[self.bootidx_oob[i]]
+            for j in self.X:
+                X_res_oob.append(j[self.bootidx_oob[i], :])
         model_i.test(X_res_oob, Y_res_oob)
         for j in self.bootlist:
             bootstatloop_oob[j].append(nested_getattr(model_i, j))
@@ -232,6 +245,7 @@ class BaseBootstrap(ABC):
                 idx = self.bootidx_oob[i][j]
                 x_loc_oob_dict[idx].append(val)
 
+        #print(x_loc_oob_dict)
         x_loc_oob_ci_dict = dict_95ci(x_loc_oob_dict)
         x_loc_oob_ci = []
         for key in x_loc_oob_ci_dict.keys():
