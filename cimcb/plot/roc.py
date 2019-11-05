@@ -467,7 +467,7 @@ def roc_boot(Y,
             idx = [np.abs(i - fpr_jack).argmin() for i in fpr_linspace]
             tpr_jackstat.append(np.array(tpr_jack[idx]))
 
-    save_stat = [tpr_bootstat, tpr_list, tpr_jackstat, fpr_linspace]
+    #save_stat = [tpr_bootstat, tpr_list, tpr_jackstat, fpr_linspace]
     if method == 'BCA':
         tpr_ib = bca_method(tpr_bootstat, tpr_list, tpr_jackstat)
 
