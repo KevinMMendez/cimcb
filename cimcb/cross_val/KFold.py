@@ -198,25 +198,32 @@ class KFold(BaseCrossVal):
         ypred_cv_i = [None] * len(Y)
         x_scores_cv_i = [None] * len(Y)
         np.random.seed(seed=None)
-        if len(X) == len(Y):
-            for train, test in self.crossval_idx.split(X, Y):
+        for train, test in self.crossval_idx.split(Y,Y):
+            try:
                 X_train = X[train, :]
                 Y_train = Y[train]
                 X_test = X[test, :]
-                if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_LinearSigmoid":
-                    model_i.compiled = True
-                    model_i.train(X_train, Y_train, w1=w1, w2=w2)
-                else:
-                    model_i.train(X_train, Y_train)
+            except TypeError:
+                X_train = []
+                Y_train = Y[train]
+                X_test =[]
+                for j in self.X:
+                    X_train.append(j[train, :])
+                    X_test.append(j[test, :])
+            if model_i.__name__ == "cimcb.model.NN_SigmoidSigmoid" or model_i.__name__ == "cimcb.model.NN_LinearSigmoid":
+                model_i.compiled = True
+                model_i.train(X_train, Y_train, w1=w1, w2=w2)
+            else:
+                model_i.train(X_train, Y_train)
 
-                ypred_cv_i_j = model_i.test(X_test)
-                # Return value to y_pred_cv in the correct position # Better way to do this
-                for (idx, val) in zip(test, ypred_cv_i_j):
-                    ypred_cv_i[idx] = val.tolist()
+            ypred_cv_i_j = model_i.test(X_test)
+            # Return value to y_pred_cv in the correct position # Better way to do this
+            for (idx, val) in zip(test, ypred_cv_i_j):
+                ypred_cv_i[idx] = val.tolist()
 
-                # Calc x_scores_cv is applicable
-                if "model.x_scores_" in model_i.bootlist:
-                    x_scores_cv_i_j = model_i.model.x_scores_
-                    for (idx, val) in zip(test, x_scores_cv_i_j):
-                        x_scores_cv_i[idx] = val.tolist()
+            # Calc x_scores_cv is applicable
+            if "model.x_scores_" in model_i.bootlist:
+                x_scores_cv_i_j = model_i.model.x_scores_
+                for (idx, val) in zip(test, x_scores_cv_i_j):
+                    x_scores_cv_i[idx] = val.tolist()
         return ypred_cv_i, x_scores_cv_i
