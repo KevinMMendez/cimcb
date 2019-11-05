@@ -57,42 +57,21 @@ class MBNN_SigmoidSigmoid(BaseModel):
         X1 = X[0]
         X2 = X[1]
 
-        # Layer for X1
-        input_X1 = Input(shape=(len(X1.T),))
-        layer1_X1 = Dense(self.n_neurons_l1, activation="sigmoid")(input_X1)
-        layer1_X1 = Model(inputs=input_X1, outputs=layer1_X1)
-
-        # Layer for X2
-        input_X2 = Input(shape=(len(X2.T),))
-        layer1_X2 = Dense(self.n_neurons_l1, activation="sigmoid")(input_X2)
-        layer1_X2 = Model(inputs=input_X2, outputs=layer1_X2)
+        # Layers in loop
+        layer1 = []
+        for i in X:
+            input_i = Input(shape=(len(i.T),))
+            layer1_i = Dense(self.n_neurons_l1, activation="sigmoid")(input_i)
+            layer1_i = Model(inputs=input_i, outputs=layer1_i)
+            layer1.append(layer1_i)
 
         # Concatenate
-        concat = concatenate([layer1_X1.output, layer1_X2.output])
+        concat = concatenate([i.output for i in layer1])
         model_concat = Dense(self.n_neurons_l2, activation="sigmoid")(concat)
         model_concat = Dense(1, activation="sigmoid")(model_concat)
 
-        self.model = Model(inputs=[layer1_X1.input, layer1_X2.input], outputs=model_concat)
+        self.model = Model(inputs=[i.input for i in layer1], outputs=model_concat)
         self.model.compile(optimizer=self.optimizer, loss=self.loss, metrics=["accuracy"])
-
-        # If epoch_ypred is True, calculate ypred for each epoch
-        if epoch_ypred is True:
-            self.epoch = YpredCallback(self.model, X, epoch_xtest)
-        else:
-            self.epoch = Callback()
-
-                #print("After: {} .... {}".format(self.model.layers[1].get_weights()[0].flatten(), self.model.pctvar_))
-        #layer1_weight = self.model.layers[0].get_weights()[0]
-        #layer1_bias = self.model.layers[0].get_weights()[1]
-        #layer2_weight = self.model.layers[1].get_weights()[0]
-        #layer2_bias = self.model.layers[1].get_weights()[1]
-
-        # Not sure about the naming scheme (trying to match PLS)
-        # self.model.x_loadings_ = layer1_weight
-        # self.model.x_scores_ = np.matmul(X, self.model.x_loadings_) + layer1_bias
-        # self.model.x_scores_alt = self.model.x_scores_
-        # self.model.y_loadings_ = layer2_weight
-        # self.model.y_scores = np.matmul(self.model.x_scores_alt, self.model.y_loadings_) + layer2_bias
 
         self.metrics_key = []
         self.model.eval_metrics_ = []
@@ -109,7 +88,7 @@ class MBNN_SigmoidSigmoid(BaseModel):
         self.model.pctvar_ = np.array([0, 0, 0])
 
         # Fit
-        self.model.fit([X1, X2], Y, epochs=self.n_epochs, batch_size=batch_size, verbose=self.verbose, callbacks=[self.epoch])
+        self.model.fit(X, Y, epochs=self.n_epochs, batch_size=batch_size, verbose=self.verbose)
 
         # Not sure about the naming scheme (trying to match PLS)
         y_pred_train = self.model.predict(X).flatten()
