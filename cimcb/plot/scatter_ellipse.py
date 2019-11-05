@@ -207,7 +207,7 @@ def scatter_ellipse(x, y, x1, y1, label=None, group=None, title="Scatter Plot", 
                 pass
 
             if scattershow is 1:
-                maxvx = max(np.abs(m).flatten())
+                maxv = max(np.abs(m).flatten())
             else:
                 maxv = max(np.abs(p).flatten())
             max_val.append(maxv)
