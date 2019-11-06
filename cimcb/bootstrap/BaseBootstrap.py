@@ -372,21 +372,21 @@ class BaseBootstrap(ABC):
                 table = self.table
                 if plot_roc == 'data':
                     tabledata = dict(
-                        evaluate=[["Train (IB"]],
+                        evaluate=[["Data (IB 95% CI)"]],
                         manw_pval=[["{}".format(table['Train'][2])]],
                         auc=[["{} ({}, {})".format(table['Train'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
                         R2=[["{} ({}, {})".format(table['Train'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
                     )
                 else:
                     tabledata = dict(
-                        evaluate=[["Train IB"]],
+                        evaluate=[["IB (95% CI)"]],
                         manw_pval=[["{}".format(table['IBMidCI'][2])]],
                         auc=[["{} ({}, {})".format(table['IBMidCI'][1], table['IBLowCI'][1], table['IBUppCI'][1])]],
                         R2=[["{} ({}, {})".format(table['IBMidCI'][0], table['IBLowCI'][0], table['IBUppCI'][0])]],
                     )
 
                 # Append test data
-                tabledata["evaluate"].append(["Train OOB"])
+                tabledata["evaluate"].append(["OOB (95% CI)"])
                 tabledata["manw_pval"].append([table['OOBMidCI'][2]])
                 tabledata["auc"].append(["{} ({}, {})".format(table['OOBMidCI'][1], table['OOBLowCI'][1], table['OOBUppCI'][1])]),
                 tabledata["R2"].append(["{} ({}, {})".format(table['OOBMidCI'][0], table['OOBLowCI'][0], table['OOBUppCI'][0])]),
