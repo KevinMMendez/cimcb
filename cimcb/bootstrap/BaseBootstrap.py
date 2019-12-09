@@ -245,7 +245,7 @@ class BaseBootstrap(ABC):
                 idx = self.bootidx_oob[i][j]
                 x_loc_oob_dict[idx].append(val)
 
-        #print(x_loc_oob_dict)
+        # print(x_loc_oob_dict)
         x_loc_oob_ci_dict = dict_95ci(x_loc_oob_dict)
         x_loc_oob_ci = []
         for key in x_loc_oob_ci_dict.keys():
@@ -474,6 +474,79 @@ class BaseBootstrap(ABC):
                             hline=0,
                             col_hline=True,
                             title="Loadings Plot: {} {}".format(lv_name, i + 1),
+                            sort_abs=sort,
+                            sort_ci=sort_ci,
+                            grid_line=grid_line,
+                            x_axis_below=x_axis_below)
+            plots.append([fig])
+
+        fig = layout(plots)
+        output_notebook()
+        show(fig)
+
+    def plot_weights(self, PeakTable, peaklist=None, data=None, ylabel="Label", sort=False, sort_ci=True, grid_line=False, plot='data', x_axis_below=True):
+        """Plots feature importance metrics.
+
+        Parameters
+        ----------
+        PeakTable : DataFrame
+            Peak sheet with the required columns.
+
+        peaklist : list or None, (default None)
+            Peaks to include in plot (the default is to include all samples).
+
+        ylabel : string, (default "Label")
+            Name of column in PeakTable to use as the ylabel.
+
+        sort : boolean, (default True)
+            Whether to sort plots in absolute descending order.
+
+        Returns
+        -------
+        Peaksheet : DataFrame
+            New PeakTable with added "Coef" and "VIP" columns (+ "Coef-95CI" and  "VIP-95CI" if calc_bootci is used prior to plot_featureimportance).
+        """
+
+        n_loadings = len(self.bootci["model.x_loadings_"])
+        ci_loadings = self.bootci["model.x_loadings_"]
+
+        if isinstance(plot, str):
+            if plot == 'data':
+                mid = self.stat['model.x_loadings_']
+            elif plot == 'median':
+                mid = []
+                for i in self.bootci['model.x_loadings_']:
+                    mid.append(i[:, 2])
+                mid = np.array(mid).T
+            else:
+                pass
+        else:
+            mid = plot
+
+        # Remove rows from PeakTable if not in peaklist
+        if peaklist is not None:
+            PeakTable = PeakTable[PeakTable["Name"].isin(peaklist)]
+        peaklabel = PeakTable[ylabel]
+
+        a = [None] * 2
+
+        if self.name == 'cimcb.model.NN_SigmoidSigmoid' or self.name == 'cimcb.model.NN_LinearSigmoid':
+            lv_name = "Neuron"
+        else:
+            lv_name = "LV"
+
+        # Plot
+        plots = []
+        for i in range(n_loadings):
+            cii = ci_loadings[i]
+            midi = mid[:, i]
+            fig = scatterCI(midi,
+                            ci=cii,
+                            label=peaklabel,
+                            hoverlabel=PeakTable[["Idx", "Name", "Label"]],
+                            hline=0,
+                            col_hline=True,
+                            title="Weights Plot: {} {}".format(lv_name, i + 1),
                             sort_abs=sort,
                             sort_ci=sort_ci,
                             grid_line=grid_line,
